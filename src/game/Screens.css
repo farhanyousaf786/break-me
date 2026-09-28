@@ -1,0 +1,218 @@
+.screen {
+  width: min(100vw, 420px);
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100svh;
+  box-sizing: border-box;
+}
+
+.intro-screen {
+  justify-content: center;
+  gap: 1rem;
+  position: relative;
+  text-align: center;
+}
+
+.intro-glow {
+  position: absolute;
+  inset: 10% 5% auto;
+  height: 40%;
+  background: radial-gradient(ellipse, rgba(242, 213, 107, 0.18), transparent 70%);
+  pointer-events: none;
+}
+
+.intro-eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9ad0ff;
+}
+
+.intro-title {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: clamp(2.8rem, 12vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #f2d56b;
+  text-shadow: 0 2px 0 #6b5310;
+  position: relative;
+}
+
+.intro-tag {
+  margin: 0;
+  max-width: 18rem;
+  color: rgba(232, 236, 242, 0.72);
+  line-height: 1.45;
+  font-size: 0.98rem;
+  position: relative;
+}
+
+.intro-duel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  position: relative;
+}
+
+.buddy {
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+}
+
+.buddy.blue {
+  background: rgba(94, 200, 255, 0.2);
+  color: #5ec8ff;
+  border: 1px solid rgba(94, 200, 255, 0.45);
+}
+
+.buddy.red {
+  background: rgba(255, 107, 122, 0.2);
+  color: #ff6b7a;
+  border: 1px solid rgba(255, 107, 122, 0.45);
+}
+
+.vs {
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+}
+
+.btn-primary {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  font-size: 1.15rem;
+  padding: 0.85rem 2.6rem;
+  border-radius: 999px;
+  color: #1a1508;
+  background: linear-gradient(180deg, #f5e08a, #d4a82a);
+  box-shadow: 0 8px 24px rgba(212, 168, 42, 0.35);
+  position: relative;
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+.intro-foot {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: rgba(232, 236, 242, 0.45);
+}
+
+.levels-screen {
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.levels-head {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.btn-ghost {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(232, 236, 242, 0.7);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  align-self: flex-start;
+  padding: 0.35rem 0;
+}
+
+.levels-title {
+  margin: 0;
+  font-size: 1.55rem;
+  color: #f2d56b;
+  letter-spacing: -0.02em;
+}
+
+.levels-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(232, 236, 242, 0.55);
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.level-card {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8ecf2;
+  font: inherit;
+  min-height: 5.5rem;
+}
+
+.level-card.open:active {
+  transform: scale(0.98);
+}
+
+.level-card.locked {
+  cursor: not-allowed;
+  opacity: 0.45;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.level-card.tier-easy.open {
+  border-color: rgba(94, 200, 255, 0.35);
+}
+
+.level-card.tier-medium.open {
+  border-color: rgba(242, 213, 107, 0.4);
+}
+
+.level-card.tier-hard.open {
+  border-color: rgba(255, 107, 122, 0.4);
+}
+
+.level-num {
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: #f2d56b;
+}
+
+.level-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.level-tier {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(232, 236, 242, 0.5);
+}
+
+.level-blurb {
+  font-size: 0.72rem;
+  color: rgba(232, 236, 242, 0.45);
+  margin-top: 0.15rem;
+}
