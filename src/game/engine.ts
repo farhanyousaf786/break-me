@@ -1,5 +1,6 @@
 import { ARENA } from './arena'
 import { getLevel } from './levels'
+import { DEFAULT_SKINS, getSkin, type SkinChoice } from './skins'
 import { playBreak, playShoot } from './sound'
 import type { Bullet, GameState, Gun, Obstacle, Particle, Phase, Shard, Vec2 } from './types'
 
@@ -20,7 +21,11 @@ const WALL_RESTITUTION = 0.55
 
 let nextBulletId = 1
 
-export function createState(levelId = 1): GameState {
+export function createState(
+  levelId = 1,
+  skins: SkinChoice = DEFAULT_SKINS,
+  opts: { redAI?: boolean } = {},
+): GameState {
   const cfg = getLevel(levelId)
 
   return {
@@ -37,7 +42,9 @@ export function createState(levelId = 1): GameState {
         spin: cfg.blueSpin,
         color: '#5ec8ff',
         accent: '#2a7fad',
+        skin: skins.blue,
         broken: false,
+        kick: 0,
       },
       {
         id: 'red',
@@ -49,7 +56,9 @@ export function createState(levelId = 1): GameState {
         spin: cfg.redSpin,
         color: '#ff6b7a',
         accent: '#c43a4a',
+        skin: skins.red,
         broken: false,
+        kick: 0,
       },
     ],
     bullets: [],
@@ -61,6 +70,7 @@ export function createState(levelId = 1): GameState {
     messageTimer: 0,
     flash: 0,
     aiReload: cfg.aiReload,
+    redAI: opts.redAI ?? true,
     recoilScale: cfg.recoilScale,
     bulletSpeed: cfg.bulletSpeed,
     bulletMode: cfg.bulletMode,
@@ -90,6 +100,7 @@ function applyRecoil(gun: Gun, recoilScale: number) {
 
   const kickDir = gun.spin >= 0 ? 1 : -1
   gun.spin += kickDir * (ANGULAR_KICK + Math.random() * 3.5) * recoilScale
+  gun.kick = 1
 }
 
 function spawnBullet(gun: Gun, bulletSpeed: number): Bullet {
@@ -145,20 +156,24 @@ function burst(particles: Particle[], x: number, y: number, color: string, count
 }
 
 /** Shatter cute character into flying pieces */
-function shatterGun(gun: Gun, shards: Shard[], particles: Particle[]) {
+export function shatterGun(gun: Gun, shards: Shard[], particles: Particle[]) {
   gun.broken = true
   playBreak()
-  burst(particles, gun.x, gun.y, gun.color, 40)
+  const skin = getSkin(gun.skin)
+  burst(particles, gun.x, gun.y, skin.body, 40)
 
   const pieces: { w: number; h: number; color: string; ox: number; oy: number }[] = [
-    { w: 14, h: 14, color: '#ffe0bd', ox: 0, oy: -12 }, // head
-    { w: 18, h: 14, color: gun.color, ox: 0, oy: 4 }, // body
-    { w: 10, h: 8, color: gun.accent, ox: -8, oy: 14 }, // foot
-    { w: 10, h: 8, color: gun.accent, ox: 8, oy: 14 },
-    { w: 12, h: 8, color: '#4a5160', ox: 20, oy: 0 }, // gun
-    { w: 14, h: 5, color: '#6b7385', ox: 32, oy: 0 }, // barrel
-    { w: 8, h: 8, color: gun.color, ox: -10, oy: -20 }, // hair
-    { w: 7, h: 7, color: '#ffe0bd', ox: 12, oy: 2 }, // hand
+    { w: 16, h: 14, color: skin.body, ox: -8, oy: -6 }, // body chunks
+    { w: 16, h: 14, color: skin.body, ox: 8, oy: -6 },
+    { w: 16, h: 12, color: skin.body, ox: 0, oy: 8 },
+    { w: 10, h: 8, color: skin.belly, ox: 0, oy: 4 },
+    { w: 9, h: 9, color: skin.earColor ?? skin.accent, ox: -12, oy: -20 }, // ears / horns
+    { w: 9, h: 9, color: skin.earColor ?? skin.accent, ox: 12, oy: -20 },
+    { w: 8, h: 6, color: skin.accent, ox: -9, oy: 18 }, // feet
+    { w: 8, h: 6, color: skin.accent, ox: 9, oy: 18 },
+    { w: 14, h: 8, color: '#8b93a7', ox: 26, oy: 0 }, // gun
+    { w: 6, h: 6, color: '#ffb3c1', ox: -10, oy: 2 }, // cheeks
+    { w: 6, h: 6, color: '#ffb3c1', ox: 10, oy: 2 },
   ]
 
   for (const p of pieces) {
@@ -195,23 +210,30 @@ function fireGun(
   playShoot()
 }
 
-export function tryShootBlue(state: GameState): GameState {
+const PLAYER_COOLDOWN = 0.28
+
+function tryShoot(state: GameState, who: 'blue' | 'red'): GameState {
   if (state.phase !== 'playing') return state
-  if (state.blueCooldown > 0) return state
-  if (state.bullets.some((b) => b.alive && b.owner === 'blue')) return state
+  if ((who === 'blue' ? state.blueCooldown : state.redCooldown) > 0) return state
+  if (state.bullets.some((b) => b.alive && b.owner === who)) return state
 
   const guns: [Gun, Gun] = [{ ...state.guns[0] }, { ...state.guns[1] }]
   const bullets = [...state.bullets]
   const particles = [...state.particles]
-  fireGun(state, guns, bullets, particles, 'blue')
+  fireGun(state, guns, bullets, particles, who)
 
-  return {
-    ...state,
-    guns,
-    bullets,
-    particles,
-    blueCooldown: 0.28,
-  }
+  return who === 'blue'
+    ? { ...state, guns, bullets, particles, blueCooldown: PLAYER_COOLDOWN }
+    : { ...state, guns, bullets, particles, redCooldown: PLAYER_COOLDOWN }
+}
+
+export function tryShootBlue(state: GameState): GameState {
+  return tryShoot(state, 'blue')
+}
+
+/** Human-controlled red (online opponent). */
+export function tryShootRed(state: GameState): GameState {
+  return tryShoot(state, 'red')
 }
 
 function hitTest(bullet: Bullet, gun: Gun): boolean {
@@ -336,6 +358,7 @@ function integrateGun(gun: Gun, dt: number, obstacles: Obstacle[]) {
   gun.vx *= Math.pow(LINEAR_DAMP, dt * 60)
   gun.vy *= Math.pow(LINEAR_DAMP, dt * 60)
   gun.spin *= Math.pow(ANGULAR_DAMP, dt * 60)
+  gun.kick = Math.max(0, gun.kick - dt * 4)
 
   const minX = ARENA.wall + GUN_RADIUS
   const maxX = ARENA.width - ARENA.wall - GUN_RADIUS
@@ -534,7 +557,7 @@ export function updateGame(state: GameState, dt: number): GameState {
       const result = handleBulletWorld(b, state, obstacles)
       if (result === 'dead') {
         b.alive = false
-        if (b.owner === 'red') redCooldown = state.aiReload
+        if (b.owner === 'red' && state.redAI) redCooldown = state.aiReload
         continue
       }
       b.trail.push({ x: b.x, y: b.y })
@@ -542,7 +565,7 @@ export function updateGame(state: GameState, dt: number): GameState {
     }
 
     const hasRedBullet = bullets.some((b) => b.alive && b.owner === 'red')
-    if (!hasRedBullet && redCooldown <= 0 && !guns[1].broken) {
+    if (state.redAI && !hasRedBullet && redCooldown <= 0 && !guns[1].broken) {
       fireGun(state, guns, bullets, particles, 'red')
     }
 
@@ -591,5 +614,9 @@ export function updateGame(state: GameState, dt: number): GameState {
 }
 
 export function retryLevel(state: GameState): GameState {
-  return createState(state.level)
+  return createState(
+    state.level,
+    { blue: state.guns[0].skin, red: state.guns[1].skin },
+    { redAI: state.redAI },
+  )
 }

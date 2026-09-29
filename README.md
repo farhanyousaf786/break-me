@@ -1,4 +1,4 @@
-# BreakMe
+# Break Buddies – Recoil Duel
 
 Hypercasual gun-duel: **You vs CPU**.
 

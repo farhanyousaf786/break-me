@@ -9,18 +9,20 @@ import {
 import { getLevel } from './levels'
 import { unlockAudio } from './sound'
 import { renderGame } from './render'
+import { getSkin, type SkinChoice } from './skins'
 import type { GameState } from './types'
 import './GameCanvas.css'
 
 type Props = {
   levelId: number
+  skins: SkinChoice
   onWin: (levelId: number) => void
   onBack: () => void
 }
 
-export function GameCanvas({ levelId, onWin, onBack }: Props) {
+export function GameCanvas({ levelId, skins, onWin, onBack }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const stateRef = useRef<GameState>(createState(levelId))
+  const stateRef = useRef<GameState>(createState(levelId, skins))
   const onWinRef = useRef(onWin)
   onWinRef.current = onWin
   const levelMeta = getLevel(levelId)
@@ -28,9 +30,9 @@ export function GameCanvas({ levelId, onWin, onBack }: Props) {
   const [runKey, setRunKey] = useState(0)
 
   useEffect(() => {
-    stateRef.current = createState(levelId)
+    stateRef.current = createState(levelId, skins)
     setHint('Tap / click to shoot')
-  }, [levelId, runKey])
+  }, [levelId, runKey, skins])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -98,7 +100,9 @@ export function GameCanvas({ levelId, onWin, onBack }: Props) {
         </div>
       </header>
 
-      <p className="mode-chip">You (blue) vs CPU (red)</p>
+      <p className="mode-chip">
+        You ({getSkin(skins.blue).name}) vs CPU ({getSkin(skins.red).name})
+      </p>
 
       <button
         type="button"

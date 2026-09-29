@@ -1,20 +1,21 @@
 {
   "expo": {
-    "name": "BreakMe",
+    "name": "Break Buddies",
     "slug": "breakme",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0e1013",
+    "backgroundColor": "#0c0b1d",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.switchtofuture.breakme"
+      "bundleIdentifier": "com.breakbuddies.ushnfay"
     },
     "android": {
-      "package": "com.switchtofuture.breakme",
+      "package": "com.breakbuddies.ushnfay",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#0e1013",
+        "backgroundColor": "#1a1440",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -26,7 +27,53 @@
     },
     "plugins": [
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 288,
+          "resizeMode": "contain",
+          "backgroundColor": "#0c0b1d"
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "delayAppMeasurementInit": true,
+          "userTrackingUsageDescription": "This lets us show you ads that are more relevant. Break Buddies stays free either way."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "-keep class com.google.android.gms.internal.consent_sdk.** { *; }"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pick a photo to put your face on your Break Buddies character. It stays on your phone.",
+          "cameraPermission": false,
+          "microphonePermission": false,
+          "colors": {
+            "cropToolbarColor": "#1a1440",
+            "cropToolbarIconColor": "#ffffff",
+            "cropToolbarActionTextColor": "#ffcf3f",
+            "cropBackButtonIconColor": "#ffffff",
+            "cropBackgroundColor": "#0c0b1d"
+          }
+        }
+      ]
     ]
+  },
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-3940256099942544~3347511713",
+    "ios_app_id": "ca-app-pub-3940256099942544~1458002511",
+    "delay_app_measurement_init": true
   }
 }

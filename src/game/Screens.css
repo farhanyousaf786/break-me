@@ -216,3 +216,127 @@
   color: rgba(232, 236, 242, 0.45);
   margin-top: 0.15rem;
 }
+
+.btn-secondary {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.6rem 1.6rem;
+  border-radius: 999px;
+  color: #f2d56b;
+  background: rgba(242, 213, 107, 0.08);
+  border: 1px solid rgba(242, 213, 107, 0.4);
+  position: relative;
+}
+
+.btn-secondary:active {
+  transform: scale(0.97);
+}
+
+.intro-buddies {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: relative;
+}
+
+.chars-screen {
+  align-items: stretch;
+  gap: 0.85rem;
+}
+
+.chars-screen .levels-title,
+.chars-screen .levels-sub {
+  text-align: center;
+}
+
+.chars-screen strong.blue {
+  color: #5ec8ff;
+}
+
+.chars-screen strong.red {
+  color: #ff6b7a;
+}
+
+.chars-duel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.chars-slot,
+.chars-card {
+  appearance: none;
+  font: inherit;
+  color: #e8ecf2;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.chars-slot {
+  padding: 0.6rem 0.4rem 0.7rem;
+}
+
+.chars-slot:active,
+.chars-card:active {
+  transform: scale(0.97);
+}
+
+.chars-slot.blue.active {
+  border-color: #5ec8ff;
+  background: rgba(94, 200, 255, 0.1);
+}
+
+.chars-slot.red.active {
+  border-color: #ff6b7a;
+  background: rgba(255, 107, 122, 0.1);
+}
+
+.chars-slot-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: rgba(232, 236, 242, 0.6);
+}
+
+.chars-slot-name {
+  font-weight: 800;
+}
+
+.chars-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+}
+
+.chars-card {
+  padding: 0.35rem 0.2rem 0.55rem;
+}
+
+.chars-card.blue.selected {
+  border-color: #5ec8ff;
+  background: rgba(94, 200, 255, 0.12);
+}
+
+.chars-card.red.selected {
+  border-color: #ff6b7a;
+  background: rgba(255, 107, 122, 0.12);
+}
+
+.chars-card-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.chars-done {
+  align-self: center;
+  margin-top: 0.4rem;
+}

@@ -1,4 +1,6 @@
 import { ARENA } from './arena'
+import { drawCharacter, type Painter, type Style } from './character'
+import { getSkin } from './skins'
 import type { Bullet, GameState, Gun, Obstacle, Particle, Shard } from './types'
 
 function drawWalls(ctx: CanvasRenderingContext2D, state: GameState) {
@@ -95,107 +97,73 @@ function drawObstacles(ctx: CanvasRenderingContext2D, obstacles: Obstacle[], acc
   }
 }
 
-function drawCharacter(ctx: CanvasRenderingContext2D, gun: Gun) {
+export function canvasPainter(ctx: CanvasRenderingContext2D): Painter {
+  const paint = (s: Style) => {
+    ctx.globalAlpha = s.alpha ?? 1
+    if (s.fill) {
+      ctx.fillStyle = s.fill
+      ctx.fill()
+    }
+    if (s.stroke) {
+      ctx.strokeStyle = s.stroke
+      ctx.lineWidth = s.width ?? 2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
+  }
+  return {
+    save: () => ctx.save(),
+    restore: () => ctx.restore(),
+    translate: (x, y) => ctx.translate(x, y),
+    rotate: (rad) => ctx.rotate(rad),
+    scale: (x, y) => ctx.scale(x, y),
+    oval(cx, cy, rx, ry, rot, s) {
+      ctx.beginPath()
+      ctx.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2)
+      paint(s)
+    },
+    circle(cx, cy, r, s) {
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      paint(s)
+    },
+    poly(pts, closed, s) {
+      ctx.beginPath()
+      pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
+      if (closed) ctx.closePath()
+      paint(s)
+    },
+    arc(cx, cy, r, a0, a1, s) {
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, a0, a1)
+      if (s.fill) ctx.closePath()
+      paint(s)
+    },
+    rrect(x, y, w, h, r, s) {
+      ctx.beginPath()
+      ctx.roundRect(x, y, w, h, r)
+      paint(s)
+    },
+    glow(cx, cy, rx, ry, color, alpha) {
+      ctx.save()
+      ctx.shadowColor = color
+      ctx.shadowBlur = 18
+      ctx.globalAlpha = alpha
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    },
+  }
+}
+
+function drawGunCharacter(p: Painter, gun: Gun, now: number) {
   if (gun.broken) return
-  const isBlue = gun.id === 'blue'
-  const skin = isBlue ? '#ffe0bd' : '#ffd4c4'
-  const outfit = gun.color
-  const outfitDark = gun.accent
-  const blush = isBlue ? '#ff9eb5' : '#ff7a90'
-  const hair = isBlue ? '#5ad0ff' : '#ff6b7a'
-
-  ctx.save()
-  ctx.translate(gun.x, gun.y)
-  ctx.rotate(gun.angle)
-
-  ctx.shadowColor = gun.color
-  ctx.shadowBlur = 16
-
-  ctx.fillStyle = outfitDark
-  ctx.beginPath()
-  ctx.ellipse(-6, 16, 7, 5, -0.2, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = outfit
-  ctx.beginPath()
-  ctx.ellipse(0, 4, 16, 14, 0, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = outfitDark
-  ctx.beginPath()
-  ctx.ellipse(8, 17, 7, 5, 0.25, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.shadowBlur = 12
-  ctx.fillStyle = skin
-  ctx.beginPath()
-  ctx.arc(0, -12, 15, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = hair
-  ctx.beginPath()
-  ctx.ellipse(-2, -24, 12, 8, -0.15, Math.PI, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.ellipse(8, -22, 6, 5, 0.4, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.shadowBlur = 0
-
-  ctx.fillStyle = skin
-  ctx.beginPath()
-  ctx.arc(-13, -18, 4, 0, Math.PI * 2)
-  ctx.arc(13, -18, 4, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = blush
-  ctx.globalAlpha = 0.55
-  ctx.beginPath()
-  ctx.ellipse(-8, -8, 3.5, 2.2, 0, 0, Math.PI * 2)
-  ctx.ellipse(8, -8, 3.5, 2.2, 0, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.globalAlpha = 1
-
-  ctx.fillStyle = '#2a2d33'
-  ctx.beginPath()
-  ctx.ellipse(-5.5, -13, 2.6, 3.4, 0, 0, Math.PI * 2)
-  ctx.ellipse(5.5, -13, 2.6, 3.4, 0, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = '#ffffff'
-  ctx.beginPath()
-  ctx.arc(-4.5, -14.5, 1.1, 0, Math.PI * 2)
-  ctx.arc(6.5, -14.5, 1.1, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.strokeStyle = '#c4786a'
-  ctx.lineWidth = 1.6
-  ctx.lineCap = 'round'
-  ctx.beginPath()
-  ctx.arc(0, -7, 4, 0.15, Math.PI - 0.15)
-  ctx.stroke()
-
-  ctx.fillStyle = skin
-  ctx.beginPath()
-  ctx.ellipse(12, 2, 5, 4, 0.2, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = '#4a5160'
-  ctx.fillRect(14, -3, 16, 10)
-  ctx.fillStyle = '#2e3440'
-  ctx.fillRect(18, 7, 7, 9)
-  ctx.fillStyle = '#6b7385'
-  ctx.fillRect(30, -1, 16, 6)
-  ctx.fillStyle = '#f5f7fa'
-  ctx.fillRect(44, 0, 5, 4)
-  ctx.fillStyle = 'rgba(255,255,255,0.45)'
-  ctx.fillRect(16, -2, 8, 2)
-
-  ctx.fillStyle = skin
-  ctx.beginPath()
-  ctx.arc(-12, 6, 4.5, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.restore()
+  const pose = { angle: gun.angle, spin: gun.spin, kick: gun.kick, color: gun.color, seed: gun.id === 'blue' ? 0 : 1.7 }
+  drawCharacter(p, gun.x, gun.y, pose, getSkin(gun.skin), now)
 }
 
 function drawBullet(ctx: CanvasRenderingContext2D, b: Bullet) {
@@ -254,7 +222,9 @@ export function renderGame(ctx: CanvasRenderingContext2D, state: GameState) {
   for (const p of state.particles) drawParticle(ctx, p)
   for (const s of state.shards) drawShard(ctx, s)
   for (const b of state.bullets) drawBullet(ctx, b)
-  for (const g of state.guns) drawCharacter(ctx, g)
+  const now = performance.now()
+  const painter = canvasPainter(ctx)
+  for (const g of state.guns) drawGunCharacter(painter, g, now)
 
   if (state.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${state.flash * 0.35})`

@@ -1,0 +1,19 @@
+{
+  "rules": {
+    "rooms": {
+      ".read": "auth != null",
+      ".indexOn": ["open"],
+      "$code": {
+        ".write": "auth != null && (!data.exists() || data.child('host').val() === auth.uid || data.child('guest').val() === auth.uid || (!data.child('guest').exists() && newData.child('guest').val() === auth.uid))"
+      }
+    },
+    "ranks": {
+      ".read": "auth != null",
+      ".indexOn": ["rp"],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider === 'google.com'",
+        ".validate": "newData.child('rp').isNumber() && newData.child('rp').val() >= 0"
+      }
+    }
+  }
+}

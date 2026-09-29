@@ -10,10 +10,14 @@ export type Gun = {
   vy: number
   angle: number
   spin: number
+  /** Team color (bullets, glow) — the character's look comes from `skin` */
   color: string
   accent: string
+  skin: string
   /** Hit — character shattered */
   broken: boolean
+  /** 1 right after firing, eases back to 0 — drives the squash / squint animation */
+  kick: number
 }
 
 export type Shard = {
@@ -73,6 +77,8 @@ export type GameState = {
   messageTimer: number
   flash: number
   aiReload: number
+  /** false when red is a real (online) player instead of the CPU */
+  redAI: boolean
   recoilScale: number
   bulletSpeed: number
   bulletMode: 'pass' | 'bounce'
