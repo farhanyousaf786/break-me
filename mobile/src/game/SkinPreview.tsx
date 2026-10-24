@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { drawCharacter } from './character'
 import { skiaPainter } from './render'
 import { useMyCharacter } from './myCharacter'
-import { ME_ID, getSkin, type Skin } from './skins'
+import { withAura } from './auras'
+import { ME_ID, getSkin, type AuraKind, type Skin } from './skins'
 
 type Props = {
   skinId: string
@@ -17,18 +18,20 @@ type Props = {
   skin?: Skin
   /** Gun skin id (guns.ts) */
   weapon?: string
+  /** Override / equip aura (auras.ts); when set, replaces the skin's built-in aura */
+  aura?: AuraKind
 }
 
 const TEAM = { blue: '#5ec8ff', red: '#ff6b7a' }
 
-export function SkinPreview({ skinId, side, size, animated = false, glow = true, skin: override, weapon }: Props) {
+export function SkinPreview({ skinId, side, size, animated = false, glow = true, skin: override, weapon, aura }: Props) {
   const [picture, setPicture] = useState<SkPicture | null>(null)
   const meRev = useMyCharacter().rev
   const rev = skinId === ME_ID || override?.photo ? meRev : 0
   const overrideKey = override ? JSON.stringify(override) : ''
 
   useEffect(() => {
-    const skin = override ?? getSkin(skinId)
+    const skin = withAura(override ?? getSkin(skinId), aura)
     const pose = {
       angle: side === 'blue' ? 0.25 : Math.PI - 0.25,
       spin: 0,
@@ -64,7 +67,7 @@ export function SkinPreview({ skinId, side, size, animated = false, glow = true,
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [skinId, side, size, animated, glow, rev, overrideKey, weapon])
+  }, [skinId, side, size, animated, glow, rev, overrideKey, weapon, aura])
 
   return (
     <Canvas style={{ width: size, height: size }} pointerEvents="none">

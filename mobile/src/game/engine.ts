@@ -43,7 +43,12 @@ let nextBulletId = 1
 export function createState(
   levelId = 1,
   skins: SkinChoice = DEFAULT_SKINS,
-  opts: { redAI?: boolean; guns?: { blue?: string; red?: string }; powerups?: boolean } = {},
+  opts: {
+    redAI?: boolean
+    guns?: { blue?: string; red?: string }
+    auras?: { blue?: string; red?: string }
+    powerups?: boolean
+  } = {},
 ): GameState {
   const cfg = getLevel(levelId)
   preloadShots([opts.guns?.blue, opts.guns?.red])
@@ -68,6 +73,7 @@ export function createState(
         accent: '#2a7fad',
         skin: skins.blue,
         weapon: opts.guns?.blue,
+        aura: opts.auras?.blue,
         broken: false,
         kick: 0,
       },
@@ -83,6 +89,7 @@ export function createState(
         accent: '#c43a4a',
         skin: skins.red,
         weapon: opts.guns?.red,
+        aura: opts.auras?.red,
         broken: false,
         kick: 0,
       },

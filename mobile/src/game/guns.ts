@@ -28,10 +28,13 @@ export const GUN_TIER: Record<GunTier, { label: string; color: string }> = {
 
 export const DEFAULT_GUN = 'blaster'
 
+/** Starter guns every player owns — never locked. */
+export const FREE_GUNS = ['blaster', 'pistol', 'water'] as const
+
 export const GUNS: GunSkin[] = [
   { id: 'blaster', name: 'Buddy Blaster', price: 0, tier: 'free' },
-  { id: 'pistol', name: 'Pew Pistol', price: 60, tier: 'common' },
-  { id: 'water', name: 'Splash Squirter', price: 90, tier: 'common' },
+  { id: 'pistol', name: 'Pew Pistol', price: 0, tier: 'free' },
+  { id: 'water', name: 'Splash Squirter', price: 0, tier: 'free' },
   { id: 'snow', name: 'Snowball Launcher', price: 100, tier: 'common' },
   { id: 'star', name: 'Star Wand', price: 110, tier: 'common' },
   { id: 'bubble', name: 'Bubble Wand', price: 120, tier: 'common' },

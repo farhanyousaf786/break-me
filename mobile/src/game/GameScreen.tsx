@@ -88,7 +88,7 @@ export function GameScreen({
   onHome,
 }: Props) {
   const level = getLevel(levelId);
-  const [initialState] = useState(() => createState(levelId, skins, { guns: levelGuns(levelId) }));
+  const [initialState] = useState(() => createState(levelId, skins, levelLoadout(levelId)));
   const stateRef = useRef<GameState>(initialState);
   const onWinRef = useRef(onWin);
   useEffect(() => {
@@ -139,7 +139,7 @@ export function GameScreen({
   };
 
   const restart = () => {
-    stateRef.current = createState(levelId, skins, { guns: levelGuns(levelId) });
+    stateRef.current = createState(levelId, skins, levelLoadout(levelId));
     promptRef.current = START_PROMPT;
     setCounting(true);
     setCountKey((k) => k + 1);
@@ -503,6 +503,11 @@ function RewardLine({ reward, par, doubled }: { reward: LevelReward; par: number
 /** You hold your equipped gun; the CPU gets a fixed gun per level for variety. */
 function levelGuns(levelId: number) {
   return { blue: getWallet().gun, red: gunForSeed(levelId) };
+}
+
+function levelLoadout(levelId: number) {
+  const w = getWallet();
+  return { guns: levelGuns(levelId), auras: { blue: w.aura } };
 }
 
 export const HUD_BUTTON = 36;

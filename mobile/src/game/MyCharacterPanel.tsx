@@ -19,7 +19,7 @@ type Props = {
 /** Top of the Characters screen: your own buddy, with a way into the creator. */
 export function MyCharacterPanel({ side, selected, sideColor, onSelect }: Props) {
   const me = useMyCharacter()
-  const { gun } = useWallet()
+  const { gun, aura } = useWallet()
   const [creating, setCreating] = useState(false)
   const created = me.created || me.photo !== null
 
@@ -41,7 +41,14 @@ export function MyCharacterPanel({ side, selected, sideColor, onSelect }: Props)
           accessibilityLabel={`Play as ${me.name}`}
           style={({ pressed }) => [styles.preview, selected && { borderColor: sideColor }, pressed && styles.pressed]}
         >
-          <SkinPreview skinId={ME_ID} side={side} size={104} animated weapon={side === 'blue' ? gun : undefined} />
+          <SkinPreview
+            skinId={ME_ID}
+            side={side}
+            size={104}
+            animated
+            weapon={side === 'blue' ? gun : undefined}
+            aura={side === 'blue' ? aura : undefined}
+          />
           {selected && (
             <View style={[styles.check, { backgroundColor: sideColor }]}>
               <Icon name="check" size={13} color="#0c0b1d" />

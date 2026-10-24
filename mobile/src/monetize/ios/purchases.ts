@@ -12,7 +12,8 @@ import { REVENUECAT_KEY } from './keys'
 
 /**
  * StoreKit on iOS, through RevenueCat.
- * In App Store Connect, create `remove_ads`, `hero_squad` and `hero_*` as Non-Consumable and
+ * In App Store Connect, create `remove_ads`, unlock packs (`all_fighters`, `all_guns`,
+ * `all_auras`, `all_fighters_guns`), `hero_squad` and `hero_*` as Non-Consumable and
  * `coins_*` as Consumable.
  */
 
@@ -29,13 +30,19 @@ const txsFor = (info: CustomerInfo | null, productId: string) =>
 function onCustomerInfo(info: CustomerInfo) {
   lastInfo = info
   const skins: string[] = []
+  const guns: string[] = []
+  const auras: string[] = []
   let noAds = false
   for (const tx of info.nonSubscriptionTransactions) {
     const product = productById(tx.productIdentifier)
-    if (product?.kind === 'skins') skins.push(...product.skins)
+    if (product?.kind === 'unlock') {
+      if (product.skins) skins.push(...product.skins)
+      if (product.guns) guns.push(...product.guns)
+      if (product.auras) auras.push(...product.auras)
+    }
     if (product?.kind === 'noAds') noAds = true
   }
-  applyOwnership({ skins, noAds })
+  applyOwnership({ skins, guns, auras, noAds })
 
   for (const [productId, before] of pendingCoins) {
     const txs = txsFor(info, productId)

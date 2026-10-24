@@ -16,6 +16,7 @@ import { SettingsScreen } from './src/game/Settings'
 import { ShopScreen } from './src/game/ShopScreen'
 import { useBack } from './src/game/useBack'
 import { AdBanner, initAds } from './src/monetize/ads'
+import type { ShopFocus } from './src/monetize/config'
 import { initPurchases } from './src/monetize/purchases'
 import { SplashIntro } from './src/game/SplashIntro'
 import { DEFAULT_SKINS, ME_ID, randomRival, type SkinChoice } from './src/game/skins'
@@ -44,11 +45,18 @@ export default function App() {
   const [player, setPlayer] = useState<Player | null | undefined>(undefined)
   const [charsFrom, setCharsFrom] = useState<Screen>('intro')
   const [shopFrom, setShopFrom] = useState<Screen>('intro')
+  const [shopFocus, setShopFocus] = useState<ShopFocus | undefined>()
+  /** Online lobby entry: `friend` opens Create Room right away. */
+  const [onlineFocus, setOnlineFocus] = useState<'friend' | undefined>()
   const [settingsFrom, setSettingsFrom] = useState<Screen>('intro')
   const [showSplash, setShowSplash] = useState(true)
   // undefined while loading; the welcome screen waits for both this and the restored sign-in.
   const [welcomed, setWelcomed] = useState<boolean | undefined>(undefined)
-  const needWelcome = onlineConfigured && welcomed === false && player !== undefined && player?.kind !== 'google'
+  // Don't dismiss splash (or show menu) until we know whether Welcome or Intro should appear.
+  // Wait for welcome flag + auth restore so we never flash the menu under the consent screen.
+  const bootReady = welcomed !== undefined && player !== undefined
+  // First launch: age + privacy/terms (even if already signed in with Google).
+  const needWelcome = welcomed === false && player !== undefined
   const finishWelcome = () => {
     setWelcomed(true)
     saveWelcomed()
@@ -81,8 +89,9 @@ export default function App() {
     setScreen('settings')
   }
 
-  const openShop = (from: Screen) => {
+  const openShop = (from: Screen, focus?: ShopFocus) => {
     setShopFrom(from)
+    setShopFocus(focus)
     setScreen('shop')
   }
 
@@ -141,13 +150,20 @@ export default function App() {
           <StatusBar style="light" />
           <View style={[styles.content, !isGame && styles.menu]}>
 
-          {screen === 'intro' && (
+          {screen === 'intro' && bootReady && !needWelcome && (
             <IntroScreen
               skins={matchSkins}
               unlocked={unlocked}
               player={player}
               onPlay={playCpu}
-              onOnline={() => setScreen('online')}
+              onOnline={() => {
+                setOnlineFocus(undefined)
+                setScreen('online')
+              }}
+              onPlayFriend={() => {
+                setOnlineFocus('friend')
+                setScreen('online')
+              }}
               onCharacters={() => openCharacters('intro')}
               onShop={() => openShop('intro')}
               onProfile={() => setScreen('profile')}
@@ -173,14 +189,27 @@ export default function App() {
             <SettingsScreen player={player} skinId={skins.blue} onBack={() => setScreen(settingsFrom)} />
           )}
 
-          {screen === 'shop' && <ShopScreen onBack={() => setScreen(shopFrom)} />}
+          {screen === 'shop' && (
+            <ShopScreen
+              focus={shopFocus}
+              onBack={() => {
+                setShopFocus(undefined)
+                setScreen(shopFrom)
+              }}
+            />
+          )}
 
           {screen === 'online' && (
             <OnlineLobby
               mySkin={skins.blue}
+              focus={onlineFocus}
               onSettings={() => openSettings('online')}
-              onBack={() => setScreen('intro')}
+              onBack={() => {
+                setOnlineFocus(undefined)
+                setScreen('intro')
+              }}
               onMatched={(m) => {
+                setOnlineFocus(undefined)
                 setMatch(m)
                 setScreen('online-play')
               }}
@@ -203,7 +232,7 @@ export default function App() {
             <CharacterSelect
               skins={skins}
               onBack={() => setScreen(charsFrom)}
-              onShop={() => openShop('chars')}
+              onShop={(focus) => openShop('chars', focus)}
               onChange={(next) => {
                 setSkins(next)
                 void saveSkins(next)
@@ -242,12 +271,19 @@ export default function App() {
           </View>
           {!isGame && <AdBanner />}
         </SafeAreaView>
-        {!showSplash && needWelcome && <WelcomeScreen onSignedIn={finishWelcome} onSkip={finishWelcome} />}
+        {!showSplash && needWelcome && (
+          <WelcomeScreen
+            alreadySignedIn={player?.kind === 'google'}
+            onSignedIn={finishWelcome}
+            onSkip={finishWelcome}
+          />
+        )}
         {showSplash && (
           <SplashIntro
+            ready={bootReady}
             onDone={() => {
               setShowSplash(false)
-              // Any consent form should appear over the menu, not the splash.
+              // Any consent form should appear over the menu / welcome, not the splash.
               void initAds()
             }}
           />

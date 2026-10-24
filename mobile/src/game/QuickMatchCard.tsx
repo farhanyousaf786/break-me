@@ -10,7 +10,6 @@ import { colors } from './theme'
 
 const FIGHTER = 104
 const ME_LINES = ["Let's go!", 'Pew pew!', "I'm ready!", 'Bring it!']
-const RIVAL_LINES = ['???', "Who's there?", 'Ready?', 'Hehe…']
 const SPARKLES = [
   { x: 0.08, y: 0.14, s: 12, d: 0 },
   { x: 0.9, y: 0.1, s: 10, d: 500 },
@@ -141,7 +140,8 @@ function Fighter({
   const tint = side === 'blue' ? colors.blue : '#ff7eb6'
   return (
     <View style={styles.fighter}>
-      <Bubble lines={side === 'blue' ? ME_LINES : RIVAL_LINES} side={side === 'blue' ? 'left' : 'right'} delay={delay * 3} />
+      {/* One chat bubble only — on your fighter — so the card stays readable. */}
+      {side === 'blue' && <Bubble lines={ME_LINES} side="left" delay={delay * 3} />}
       <View style={{ width: FIGHTER, height: FIGHTER, alignItems: 'center', justifyContent: 'flex-end' }}>
         <Animated.View
           style={[

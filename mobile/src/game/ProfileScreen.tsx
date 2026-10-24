@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { signInWithGoogle, type Player } from '../net/account'
 import { onlineConfigured } from '../net/firebase'
 import { Avatar } from './Avatar'
+import { PlayerName } from './PlayerName'
 import { RankCard } from './RankCard'
 import { LEVELS } from './levels'
 import { getSkin } from './skins'
@@ -22,6 +23,7 @@ export function ProfileScreen({ player, skinId, unlocked, onCharacters, onBack }
   const stats = useStats()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState(false)
 
   const run = async (action: () => Promise<unknown>) => {
     setError(null)
@@ -40,7 +42,6 @@ export function ProfileScreen({ player, skinId, unlocked, onCharacters, onBack }
   const winRate = onlineGames ? `${Math.round((stats.onlineWins / onlineGames) * 100)}%` : '–'
 
   const google = player?.kind === 'google'
-  const name = google ? player.name : 'Not signed in'
   const subtitle = google ? 'Signed in with Google' : 'Sign in with Google to play online'
 
   return (
@@ -49,11 +50,15 @@ export function ProfileScreen({ player, skinId, unlocked, onCharacters, onBack }
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Panel style={styles.card}>
           <Avatar player={player} skinId={skinId} size={96} ring={google ? colors.blue : colors.textFaint} />
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>
-              {name}
-            </Text>
-            {google && (
+          <View style={[styles.nameRow, renaming && styles.nameRowEditing]}>
+            {google ? (
+              <PlayerName player={player} textStyle={styles.name} onEditing={setRenaming} />
+            ) : (
+              <Text style={styles.name} numberOfLines={1}>
+                Not signed in
+              </Text>
+            )}
+            {google && !renaming && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>GOOGLE</Text>
               </View>
@@ -149,6 +154,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
     maxWidth: '100%',
+  },
+  nameRowEditing: {
+    alignSelf: 'stretch',
   },
   name: {
     color: colors.text,

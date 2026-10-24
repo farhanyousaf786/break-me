@@ -125,7 +125,7 @@ function Twinkle({ x, y, size, color, delay }: (typeof TWINKLES)[number]) {
  * background color, so this intro starts with Cosmo at that exact spot and size, then lifts him into
  * place while the space scene fades in, making both read as one continuous splash.
  */
-export function SplashIntro({ onDone }: { onDone: () => void }) {
+export function SplashIntro({ onDone, ready = true }: { onDone: () => void; ready?: boolean }) {
   const { width, height } = useWindowDimensions()
   const hero = Math.min(width * 0.48, height * 0.26, 230)
   const startScale = (SPLASH_UNIT_DP * 110) / hero
@@ -143,13 +143,25 @@ export function SplashIntro({ onDone }: { onDone: () => void }) {
   const driftB = useLoop(3600, 500)
   const finished = useRef(false)
   const started = useRef(false)
+  const holdElapsed = useRef(false)
+  const readyRef = useRef(ready)
+  readyRef.current = ready
   const layout = useRef<{ rootH?: number; heroMid?: number }>({})
 
   const finish = () => {
     if (finished.current) return
+    // Skip / timer both count as "hold done"; still wait for auth so menu never flashes under welcome.
+    holdElapsed.current = true
+    if (!readyRef.current) return
     finished.current = true
     Animated.timing(fade, { toValue: 0, duration: FADE_MS, useNativeDriver: true }).start(onDone)
   }
+
+  useEffect(() => {
+    if (ready && holdElapsed.current) finish()
+    // finish reads latest refs; only re-run when ready flips true.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready])
 
   const start = () => {
     if (started.current) return
@@ -187,7 +199,10 @@ export function SplashIntro({ onDone }: { onDone: () => void }) {
         Animated.delay(900),
       ]),
     ).start()
-    holdTimer.current = setTimeout(finish, HOLD_MS)
+    holdTimer.current = setTimeout(() => {
+      holdElapsed.current = true
+      finish()
+    }, HOLD_MS)
   }
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)

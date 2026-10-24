@@ -32,8 +32,8 @@ Players choose **Play as Guest** (anonymous account) or **Sign in with Google**.
 Guest play works with the steps above. To enable Google:
 
 1. Authentication → Sign-in method → enable **Google**.
-2. Project settings → add an **Android** app with package `com.breakbuddies.ushnfay`, and add your debug SHA-1 (`cd android && ./gradlew signingReport`, or `keytool -list -v -keystore ~/.android/debug.keystore -storepass android`). Download `google-services.json` into `mobile/`.
-3. Add an **iOS** app with bundle id `com.breakbuddies.ushnfay` and download `GoogleService-Info.plist` into `mobile/`.
+2. Project settings → add an **Android** app with package `com.breakbuddies.wolfhowlsstudio`, and add your debug SHA-1 (`cd android && ./gradlew signingReport`, or `keytool -list -v -keystore ~/.android/debug.keystore -storepass android`). Download `google-services.json` into `mobile/`.
+3. Add an **iOS** app with bundle id `com.breakbuddies.wolfhowlsstudio` and download `GoogleService-Info.plist` into `mobile/`.
 4. Authentication → Sign-in method → Google → Web SDK configuration → copy the **Web client ID** into `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` in `.env.local`.
 5. Rebuild natively (`npx expo run:android --device` / `npx expo run:ios`). Google sign-in is a native module, and the Firebase files are only picked up by `app.config.js` at build time.
 

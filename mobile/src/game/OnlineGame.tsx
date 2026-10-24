@@ -42,7 +42,7 @@ import { recordOnlineResult } from './stats'
 import { colors } from './theme'
 import type { GameState } from './types'
 import { CoinDot, GameButton, IconButton } from './ui'
-import { rewardOnline } from './wallet'
+import { getWallet, rewardOnline } from './wallet'
 import { useBack } from './useBack'
 import { maybeShowInterstitial, noteResult } from '../monetize/ads'
 
@@ -61,22 +61,6 @@ const GUEST_SHOT_GAP_MS = 300
 /** Longest the host waits for the guest's screen before starting the first countdown anyway. */
 const READY_WAIT_MS = 6000
 const EARLY_SHOT_GRACE_MS = 400
-
-/** Dev-only trace for "tap didn't shoot" reports; wall-clock time so both phones' logs line up. */
-function track(role: string, msg: string) {
-  if (__DEV__) console.log(`[shot ${role}] ${new Date().toISOString().slice(11, 23)} ${msg}`)
-}
-
-function whyNoShot(state: GameState, who: 'blue' | 'red'): string {
-  const gun = state.guns[who === 'blue' ? 0 : 1]
-  if (state.phase !== 'playing') return `phase=${state.phase}`
-  const cd = who === 'blue' ? state.blueCooldown : state.redCooldown
-  if (cd > 0) return `cooldown ${cd.toFixed(2)}s`
-  if (state.bullets.some((b) => b.alive && b.owner === who)) return 'own bullet still flying'
-  if (gun.burstLeft) return 'burst in progress'
-  if (gun.fx?.frozen) return 'frozen power-up'
-  return 'unknown'
-}
 
 const randomLevel = () => 1 + Math.floor(Math.random() * LEVELS.length)
 const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)]
@@ -123,7 +107,14 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
     blue: isGunId(match.hostGun) ? match.hostGun : DEFAULT_GUN,
     red: isGunId(match.guestGun) ? match.guestGun : DEFAULT_GUN,
   }))
-  const [initial] = useState(() => createState(isHost ? randomLevel() : 1, skins, { redAI: bot, guns, powerups: true }))
+  // Show your equipped aura on your side; rival aura isn't synced over the wire yet.
+  const [auras] = useState(() => {
+    const mine = getWallet().aura
+    return isHost ? { blue: mine } : { red: mine }
+  })
+  const [initial] = useState(() =>
+    createState(isHost ? randomLevel() : 1, skins, { redAI: bot, guns, auras, powerups: true }),
+  )
 
   const stateRef = useRef<GameState>(initial)
   // The 3-2-1 countdown covers the first round's wait, so no banner underneath it.
@@ -347,8 +338,6 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
         ? () => {}
         : onShot(match.code, () => {
             redShotsRef.current += 1
-            const left = freezeUntilRef.current - performance.now()
-            track('host', `guest shot received${left > 0 ? ` (countdown ${Math.round(left)}ms left)` : ''}`)
           })
       let lastSnap = 0
       let round = 1
@@ -369,16 +358,9 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
           const at = performance.now() + COUNTDOWN_MS
           freezeUntilRef.current = at
           setGoAt(at)
-          track('host', 'countdown started')
         }
-        readyWait = setTimeout(() => {
-          track('host', 'guest ready never arrived, starting anyway')
-          begin()
-        }, READY_WAIT_MS)
-        unsubReady = onGuestReady(match.code, () => {
-          track('host', 'guest ready received')
-          begin()
-        })
+        readyWait = setTimeout(begin, READY_WAIT_MS)
+        unsubReady = onGuestReady(match.code, begin)
       }
 
       const tick = () => {
@@ -392,18 +374,13 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
         if (!over) {
           if (now < freezeUntilRef.current) {
             // A tap just before GO (network jitter) still counts once play starts.
-            if (freezeUntilRef.current - now > EARLY_SHOT_GRACE_MS && redShotsRef.current > 0) {
-              track('host', `guest shot DROPPED: arrived ${Math.round(freezeUntilRef.current - now)}ms before GO`)
-              redShotsRef.current = 0
-            }
+            if (freezeUntilRef.current - now > EARLY_SHOT_GRACE_MS) redShotsRef.current = 0
             state = ageTaunts(state, dt)
           } else {
             messageRef.current = ''
             if (redShotsRef.current > 0) {
               redShotsRef.current = 0
-              const before = state
               state = tryShootRed(state)
-              track('host', state === before ? `guest shot BLOCKED: ${whyNoShot(before, 'red')}` : 'guest shot fired')
             }
             state = updateGame(state, dt)
             if (state.phase !== 'playing' && settleAt === 0) settleAt = now + ROUND_PAUSE_MS
@@ -425,7 +402,7 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
                 }
               } else {
                 round += 1
-                state = createState(randomLevel(), skins, { redAI: bot, guns, powerups: true })
+                state = createState(randomLevel(), skins, { redAI: bot, guns, auras, powerups: true })
                 freezeUntilRef.current = now + COUNTDOWN_MS
                 messageRef.current = ''
                 startRound(round, freezeUntilRef.current)
@@ -461,7 +438,6 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
     let round = -1
     let syncedGoAt: number | null = null
     markReady(match.code)
-    track('guest', 'ready sent')
     const unsubSnap = onSnapshot(match.code, (s) => {
       latest = s
       fresh = true
@@ -483,19 +459,16 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
             pendingShotRef.current = false
           }
           round = snap.r
-          state = createState(snap.lv, skins, { redAI: false, guns, powerups: true })
+          state = createState(snap.lv, skins, { redAI: false, guns, auras, powerups: true })
         }
         state = applySnapshot(state, snap)
         messageRef.current = snap.m ?? ''
-        const live = snap.c === undefined || snap.c === 0
-        if (live !== hostLiveRef.current) track('guest', live ? 'host is LIVE' : `host counting (c=${snap.c})`)
-        hostLiveRef.current = live
+        hostLiveRef.current = snap.c === undefined || snap.c === 0
         if (countingRef.current && snap.c !== undefined && snap.c >= 0) {
           const at = now + snap.c
           if (syncedGoAt === null || Math.abs(at - syncedGoAt) > 150) {
             syncedGoAt = at
             setGoAt(at)
-            track('guest', `countdown synced, GO in ${snap.c}ms`)
           }
         }
       }
@@ -517,31 +490,19 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
   }, [])
 
   const fire = () => {
-    const role = match.role
-    if (overlay || countingRef.current) {
-      track(role, `tap ignored: ${overlay ? `overlay=${overlay}` : 'countdown still showing'}`)
-      return
-    }
+    if (overlay || countingRef.current) return
     const now = performance.now()
     if (isHost) {
-      if (now < freezeUntilRef.current) {
-        const left = freezeUntilRef.current - now
-        track(role, `tap ignored: frozen ${left === Number.POSITIVE_INFINITY ? '(waiting for guest)' : `${Math.round(left)}ms more`}`)
-        return
-      }
+      if (now < freezeUntilRef.current) return
       const prev = stateRef.current
       stateRef.current = tryShootBlue(prev)
       if (stateRef.current !== prev) {
         trackDaily('shots')
-        track(role, 'tap fired')
-      } else {
-        track(role, `tap BLOCKED: ${whyNoShot(prev, 'blue')}`)
       }
       return
     }
     // Our GO can land a moment before the host's; hold the tap and send it once the host is live.
     if (!hostLiveRef.current) {
-      track(role, 'tap queued: host not live yet')
       pendingShotRef.current = true
       return
     }
@@ -550,26 +511,11 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
 
   function guestShoot(state: GameState) {
     const now = performance.now()
-    const block = messageRef.current
-      ? `banner "${messageRef.current}"`
-      : state.phase !== 'playing'
-        ? `phase=${state.phase}`
-        : now - lastShotRef.current < GUEST_SHOT_GAP_MS
-          ? 'tapped too fast'
-          : state.bullets.some((b) => b.owner === 'red')
-            ? 'own bullet still flying'
-            : state.guns[1].burstLeft
-              ? 'burst in progress'
-              : state.guns[1].fx?.frozen
-                ? 'frozen power-up'
-                : ''
-    if (block) {
-      track('guest', `tap BLOCKED: ${block}`)
-      return
-    }
+    if (messageRef.current || state.phase !== 'playing') return
+    if (now - lastShotRef.current < GUEST_SHOT_GAP_MS) return
+    if (state.bullets.some((b) => b.owner === 'red') || state.guns[1].burstLeft || state.guns[1].fx?.frozen) return
     lastShotRef.current = now
     sendShot(match.code)
-    track('guest', 'shot sent to host')
     trackDaily('shots')
     // Instant squash feedback; position and bullet arrive with the next host snapshot.
     const guns = [...state.guns] as GameState['guns']
@@ -673,7 +619,6 @@ export function OnlineGame({ match, onExit, onRematch }: Props) {
                     : `You ${score[mySide]} – ${score[oppSide]} ${oppName}`
             }
             onGo={() => {
-              track(match.role, 'GO shown')
               countingRef.current = false
             }}
             onDone={() => setCounting(false)}

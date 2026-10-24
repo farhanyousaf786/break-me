@@ -17,14 +17,14 @@ import {
   type BestOf,
   type Match,
 } from '../net/rooms'
-import { LiveBanner, LiveFeed, OnlineRecord, SearchingCard } from './LobbyWidgets'
+import { LiveBanner, SearchingCard } from './LobbyWidgets'
 import { QuickMatchCard } from './QuickMatchCard'
 import { RankCard } from './RankCard'
 import { CPU_GUNS } from './guns'
 import { myNetworkSkin } from './myCharacter'
 import { getWallet } from './wallet'
 import { ME_ID, SKINS, getSkin, remoteSkin } from './skins'
-import { playVoice } from './sound'
+import { playFanfare } from './sound'
 import { SkinPreview } from './SkinPreview'
 import { colors } from './theme'
 import { GameButton, Icon, IconButton, Panel, ScreenHeader } from './ui'
@@ -32,6 +32,8 @@ import { useBack } from './useBack'
 
 type Props = {
   mySkin: string
+  /** `friend` = jump straight into Create Room (from main menu "Play with Friend"). */
+  focus?: 'friend'
   onMatched: (match: Match) => void
   onSettings: () => void
   onBack: () => void
@@ -54,7 +56,7 @@ const BOT_JITTER_MS = 3000
 /** How often a waiting player re-checks for someone who opened a room at the same moment. */
 const SCAN_MS = 1000
 
-export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
+export function OnlineLobby({ mySkin, focus, onMatched, onSettings, onBack }: Props) {
   const [view, setView] = useState<View_>({ kind: 'menu' })
   const [codeInput, setCodeInput] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -62,6 +64,7 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
   const [player, setPlayer] = useState<Player | null | undefined>(undefined)
   const [authBusy, setAuthBusy] = useState(false)
   const playerName = player?.name ?? 'Player'
+  const friendFocusRef = useRef(focus === 'friend')
 
   useEffect(() => watchPlayer(setPlayer), [])
 
@@ -106,7 +109,7 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
     hostingRef.current = null
     const host = match.role === 'host'
     setFound({ name: host ? match.guestName : match.hostName, skin: remoteSkin(host ? match.guestSkin : match.hostSkin) })
-    playVoice('yay')
+    playFanfare()
     revealRef.current = setTimeout(() => {
       if (aliveRef.current) onMatched(match)
     }, REVEAL_MS)
@@ -244,13 +247,33 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
     }
   }
 
+  // Main menu "Play with Friend" → open a private room as soon as Google sign-in is ready.
+  useEffect(() => {
+    if (!friendFocusRef.current) return
+    if (player?.kind !== 'google') return
+    if (view.kind !== 'menu') return
+    friendFocusRef.current = false
+    void createPrivate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player, view.kind])
+
   const joinByCode = async () => {
     const code = normalizeCode(codeInput)
     if (code.length !== 5) {
       setError('Room codes have 5 characters.')
       return
     }
+    // Don't try to join the room you're already hosting.
+    if (hostingRef.current?.code === code) {
+      setError("That's your own room — share it, or enter your friend's code.")
+      return
+    }
     setError(null)
+    // Leaving a waiting room? Close it first so it doesn't sit empty.
+    stopWatching()
+    const hosting = hostingRef.current
+    hostingRef.current = null
+    if (hosting) void cancelRoom(hosting.code)
     setView({ kind: 'busy', label: `Joining ${code}…` })
     try {
       finish(await joinRoom(code, netSkin(), playerName, getWallet().gun))
@@ -340,9 +363,6 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
           <Perk icon="levels" text="Challenge friends with a private room code" />
           <Perk icon="trophy" text="Get ranked: earn RP, climb tiers and the global board" />
         </Panel>
-
-        <OnlineRecord />
-        <LiveFeed />
       </ScrollView>
     )
   }
@@ -392,14 +412,13 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
 
           <RankCard player={player} />
 
-          <OnlineRecord />
-
           <View style={styles.divider}>
             <View style={styles.line} />
             <Text style={styles.dividerText}>PLAY A FRIEND</Text>
             <View style={styles.line} />
           </View>
 
+          <Text style={styles.friendGuide}>Create a room → share the code → your friend taps Join</Text>
           <GameButton label="Create Room" icon="levels" variant="blue" size="sm" onPress={createPrivate} />
 
           <Panel style={styles.joinPanel}>
@@ -420,8 +439,6 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
               <GameButton label="Join" variant="green" size="sm" onPress={joinByCode} />
             </View>
           </Panel>
-
-          <LiveFeed />
         </>
       )}
 
@@ -440,7 +457,7 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
 
       {view.kind === 'hosting' && !view.quick && (
         <Panel style={styles.center}>
-          <Text style={styles.joinLabel}>ROOM CODE</Text>
+          <Text style={styles.joinLabel}>YOUR ROOM CODE</Text>
           <View style={styles.codeRow}>
             {view.code.split('').map((ch, i) => (
               <View key={i} style={styles.codeTile}>
@@ -448,12 +465,37 @@ export function OnlineLobby({ mySkin, onMatched, onSettings, onBack }: Props) {
               </View>
             ))}
           </View>
-          <Text style={styles.body}>Send this code to your friend</Text>
+          <Text style={styles.body}>Share this code — or join theirs below</Text>
           <GameButton label="Share Invite" icon="next" variant="green" onPress={() => shareCode(view.code)} />
           <View style={styles.waitRow}>
             <ActivityIndicator color={colors.textDim} />
             <Text style={styles.caption}>Waiting for your friend…</Text>
           </View>
+
+          <View style={styles.orRow}>
+            <View style={styles.line} />
+            <Text style={styles.dividerText}>OR JOIN THEIRS</Text>
+            <View style={styles.line} />
+          </View>
+          <View style={styles.joinRowHost}>
+            <TextInput
+              value={codeInput}
+              onChangeText={(t) => {
+                setCodeInput(normalizeCode(t))
+                if (error) setError(null)
+              }}
+              placeholder="Friend's code"
+              placeholderTextColor="rgba(241, 243, 250, 0.25)"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={5}
+              style={styles.input}
+              returnKeyType="go"
+              onSubmitEditing={joinByCode}
+            />
+            <GameButton label="Join" variant="blue" size="sm" onPress={joinByCode} />
+          </View>
+
           <GameButton label="Cancel" variant="dark" size="sm" onPress={cancelHosting} />
         </Panel>
       )}
@@ -606,6 +648,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2,
   },
+  friendGuide: {
+    color: colors.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: -4,
+  },
   joinPanel: {
     gap: 6,
     paddingVertical: 8,
@@ -677,5 +726,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginTop: 2,
+  },
+  orRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+  },
+  joinRowHost: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 })

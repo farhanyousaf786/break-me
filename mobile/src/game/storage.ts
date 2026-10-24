@@ -66,6 +66,23 @@ export function saveWelcomed() {
   })
 }
 
+const INTRO_GUIDE_KEY = 'breakme_intro_guide'
+
+/** Whether the main-menu how-to tips have been dismissed. */
+export async function loadIntroGuideSeen(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(INTRO_GUIDE_KEY)) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveIntroGuideSeen() {
+  AsyncStorage.setItem(INTRO_GUIDE_KEY, '1').catch(() => {
+    // Tips may show again next launch at worst.
+  })
+}
+
 /** Tester shortcut: marks every level as cleared. */
 export async function unlockAllLevels(): Promise<number> {
   try {

@@ -17,7 +17,7 @@ import {
   useDaily,
 } from './daily'
 import { buzz } from './haptics'
-import { playTap, playVoice } from './sound'
+import { playFanfare, playTap, playVoice } from './sound'
 import { colors } from './theme'
 import { CoinDot, GameButton, Icon, Panel } from './ui'
 
@@ -177,7 +177,7 @@ function Missions() {
               size="sm"
               onPress={() => {
                 if (claimBonus() > 0) {
-                  playVoice('woo')
+                  playFanfare()
                   buzz('win')
                 }
               }}
@@ -308,7 +308,7 @@ function LuckySpin({ onSpinning }: { onSpinning: (on: boolean) => void }) {
       setBusy('idle')
       onSpinning(false)
       setWon(SPIN_PRIZES[index].coins)
-      playVoice('yay')
+      playFanfare()
       buzz('win')
     })
   }

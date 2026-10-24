@@ -15,11 +15,12 @@ import {
 } from '@shopify/react-native-skia'
 import { PixelRatio, Platform } from 'react-native'
 import { ARENA } from './arena'
+import { withAura } from './auras'
 import { drawCharacter, drawProjectile, type Painter, type Style } from './character'
 import { gunFire } from './guns'
 import { getFaceImage } from './myCharacter'
 import { BUBBLE_RADIUS, drawPowerIcon, POWERS } from './powerups'
-import { getSkin } from './skins'
+import { getSkin, type AuraKind } from './skins'
 import { TAUNT_LIFE } from './engine'
 import type { Boom, Bullet, GameState, Gun, Obstacle, Particle, PowerUp, Shard, Taunt, Vec2 } from './types'
 
@@ -459,7 +460,8 @@ function drawGunCharacter(p: Painter, gun: Gun, now: number) {
     p.scale(0.55, 0.55)
     p.translate(-gun.x, -gun.y)
   }
-  drawCharacter(p, gun.x, gun.y, pose, getSkin(gun.skin), now)
+  const skin = withAura(getSkin(gun.skin), gun.aura as AuraKind | undefined)
+  drawCharacter(p, gun.x, gun.y, pose, skin, now)
   if (fx?.tiny) p.restore()
   if (!fx) return
 

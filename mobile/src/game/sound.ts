@@ -28,8 +28,12 @@ const VOICES = {
 } as const
 export type Voice = keyof typeof VOICES
 
+/** Soft preview level relative to the player's SFX setting (locker browsing). */
+const PREVIEW_DIM = 0.42
+
 // Keyed by gun id (guns.ts); unknown ids and the Buddy Blaster use shoot.wav.
 const GUN_SHOTS: Record<string, number> = {
+  blaster: require('../../assets/sfx/shoot.wav'),
   pistol: require('../../assets/sfx/shoot-pistol.wav'),
   water: require('../../assets/sfx/shoot-water.wav'),
   snow: require('../../assets/sfx/shoot-snow.wav'),
@@ -70,7 +74,26 @@ const GUN_SHOTS: Record<string, number> = {
   galaxy: require('../../assets/sfx/shoot-galaxy.wav'),
 }
 
-const SHOT_VOICES: Voice[] = ['squeak', 'wee', 'woo', 'hehe', 'squeak']
+/** Unique soft sting per aura id (auras.ts) for locker preview. */
+const AURA_SFX: Record<string, number> = {
+  none: require('../../assets/sfx/aura-none.wav'),
+  bubbles: require('../../assets/sfx/aura-bubbles.wav'),
+  sparkle: require('../../assets/sfx/aura-sparkle.wav'),
+  hearts: require('../../assets/sfx/aura-hearts.wav'),
+  stars: require('../../assets/sfx/aura-stars.wav'),
+  flames: require('../../assets/sfx/aura-flames.wav'),
+  rainbow: require('../../assets/sfx/aura-rainbow.wav'),
+  orbit: require('../../assets/sfx/aura-orbit.wav'),
+  lightning: require('../../assets/sfx/aura-lightning.wav'),
+  petals: require('../../assets/sfx/aura-petals.wav'),
+  snow: require('../../assets/sfx/aura-snow.wav'),
+  void: require('../../assets/sfx/aura-void.wav'),
+  neon: require('../../assets/sfx/aura-neon.wav'),
+  rings: require('../../assets/sfx/aura-rings.wav'),
+}
+
+// Skip "wee" (eeee-like) — shots keep short chirps; big moments use playFanfare (power-up).
+const SHOT_VOICES: Voice[] = ['squeak', 'woo', 'hehe', 'squeak']
 const HIT_VOICES: Voice[] = ['uhoh', 'oof', 'uhoh', 'eek']
 // Kept low so the gun sound itself carries each shot.
 const SHOT_VOICE_CHANCE = 0.25
@@ -84,6 +107,7 @@ let shootPool: Pool | null = null
 const gunPools = new Map<string, Pool>()
 const MAX_GUN_POOLS = 4
 let previewPlayer: AudioPlayer | null = null
+let auraPreviewPlayer: AudioPlayer | null = null
 let breakPool: Pool | null = null
 let diePool: Pool | null = null
 const DIE_DELAY_MS = 260
@@ -100,29 +124,69 @@ function makePool(source: number, size: number): Pool {
   return { players: Array.from({ length: size }, () => createAudioPlayer(source)), next: 0 }
 }
 
-/** Load sounds once; call early (e.g. app start) so the first shot isn't delayed. */
+/** Voice pools are created on first use so startup doesn't build ~11 native players at once. */
+function voicePool(voice: Voice): Pool {
+  let pool = voicePools[voice]
+  if (!pool) {
+    pool = makePool(VOICES[voice], 1)
+    voicePools[voice] = pool
+  }
+  return pool
+}
+
+/** Yield between preloads so Android isn't jammed decoding ~50 WAVs in one frame. */
+async function warmAssetsInBackground() {
+  // Common voices first — wins / unlocks / picks hit these often.
+  for (const v of ['yay', 'woo', 'wahwah', 'squeak', 'hehe', 'uhoh'] as Voice[]) {
+    voicePool(v)
+    await new Promise((r) => setTimeout(r, 20))
+  }
+
+  if (!music) {
+    music = createAudioPlayer(require('../../assets/sfx/music.wav'))
+    music.loop = true
+    syncMusic()
+  }
+
+  // Warm reusable locker preview players once so the first tap isn't a cold createAudioPlayer.
+  if (!previewPlayer) previewPlayer = createAudioPlayer(GUN_SHOTS.blaster)
+  if (!auraPreviewPlayer) auraPreviewPlayer = createAudioPlayer(AURA_SFX.bubbles)
+
+  // Byte-cache the rest so the first locker preview / match shot isn't cold.
+  if (Platform.OS === 'android') {
+    const sources = [
+      ...Object.values(GUN_SHOTS),
+      ...Object.values(AURA_SFX),
+      ...Object.values(VOICES),
+    ]
+    for (const source of sources) {
+      await preload(source).catch(() => {})
+      await new Promise((r) => setTimeout(r, 12))
+    }
+  } else {
+    for (const v of Object.keys(VOICES) as Voice[]) {
+      voicePool(v)
+      await new Promise((r) => setTimeout(r, 20))
+    }
+  }
+}
+
+/**
+ * Load core SFX once at app start. Heavy assets (music, every gun/aura/voice) warm in the
+ * background — creating them all synchronously was freezing the first sound ~10s on Android.
+ */
 export function initSound() {
   if (ready) return
   ready = true
   void setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' })
-  // Android keeps preloaded files as bytes in memory (~0.5 MB for every gun), so a gun's players load
-  // near-instantly when a match starts instead of fetching the file on the first shot. On iOS
-  // preload() builds a native player per file, and bundled files load fast anyway.
-  if (Platform.OS === 'android') {
-    for (const source of Object.values(GUN_SHOTS)) void preload(source).catch(() => {})
-  }
+
   shootPool = makePool(require('../../assets/sfx/shoot.wav'), 3)
   breakPool = makePool(require('../../assets/sfx/break.wav'), 2)
   diePool = makePool(require('../../assets/sfx/die.wav'), 1)
   tapPool = makePool(require('../../assets/sfx/tap.wav'), 2)
   powerPool = makePool(require('../../assets/sfx/powerup.wav'), 1)
   shieldPool = makePool(require('../../assets/sfx/shield.wav'), 1)
-  voicePools = Object.fromEntries(
-    (Object.keys(VOICES) as Voice[]).map((v) => [v, makePool(VOICES[v], 1)]),
-  ) as Record<Voice, Pool>
-
-  music = createAudioPlayer(require('../../assets/sfx/music.wav'))
-  music.loop = true
+  voicePools = {}
 
   AppState.addEventListener('change', (status) => {
     appActive = status === 'active'
@@ -133,6 +197,11 @@ export function initSound() {
     settings = saved
     syncMusic()
   })
+
+  // After first paint / splash — don't block taps or the first shot.
+  setTimeout(() => {
+    void warmAssetsInBackground()
+  }, 400)
 }
 
 function syncMusic() {
@@ -164,8 +233,9 @@ function play(pool: Pool | null | undefined, level: Level) {
 const pick = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)]
 
 export function playVoice(voice: Voice) {
+  if (!ready) initSound()
   lastVoiceAt = Date.now()
-  play(voicePools[voice], settings.voice)
+  play(voicePool(voice), settings.voice)
 }
 
 /** Voice that only fires if nobody spoke very recently, so rapid fire doesn't turn into noise. */
@@ -193,14 +263,36 @@ function shotPool(weapon: string | undefined): Pool | null {
   return pool
 }
 
-/** Gun locker preview: one reusable player, so browsing every gun never piles up native players. */
+/** Gun locker preview: dim unique shot while the stage shows your fighter holding that gun. */
 export function previewShot(weapon: string) {
-  if (!ready || settings.sfx === 0) return
+  if (!ready) initSound()
+  if (settings.sfx === 0) return
   const source = GUN_SHOTS[weapon] ?? require('../../assets/sfx/shoot.wav')
-  if (previewPlayer) previewPlayer.replace(source)
-  else previewPlayer = createAudioPlayer(source)
-  previewPlayer.volume = LEVEL_VOLUME[settings.sfx]
+  // Prefer replace on a warm player; creating a brand-new native player is what felt like 10s+ hangs.
+  if (previewPlayer) {
+    previewPlayer.replace(source)
+  } else {
+    previewPlayer = createAudioPlayer(source)
+  }
+  previewPlayer.volume = LEVEL_VOLUME[settings.sfx] * PREVIEW_DIM
+  if (previewPlayer.currentTime > 0) void previewPlayer.seekTo(0)
   previewPlayer.play()
+}
+
+/** Aura locker preview: dim unique sting while the stage shows your fighter with that aura. */
+export function previewAura(aura: string) {
+  if (!ready) initSound()
+  if (settings.sfx === 0) return
+  const source = AURA_SFX[aura] ?? AURA_SFX.none
+  if (!source) return
+  if (auraPreviewPlayer) {
+    auraPreviewPlayer.replace(source)
+  } else {
+    auraPreviewPlayer = createAudioPlayer(source)
+  }
+  auraPreviewPlayer.volume = LEVEL_VOLUME[settings.sfx] * PREVIEW_DIM
+  if (auraPreviewPlayer.currentTime > 0) void auraPreviewPlayer.seekTo(0)
+  auraPreviewPlayer.play()
 }
 
 /** Load the shot sounds for these guns ahead of time (e.g. at match start) so the first shot isn't silent. */
@@ -226,6 +318,11 @@ export function playTap() {
 
 export function playPowerUp() {
   play(powerPool, settings.sfx)
+}
+
+/** Unique sting for rival found, daily bonus, and other big wins (not a voice clip). */
+export function playFanfare() {
+  playPowerUp()
 }
 
 export function playShieldBlock() {

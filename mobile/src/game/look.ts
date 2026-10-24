@@ -79,7 +79,23 @@ export const HATS: HatKind[] = ['none', 'party', 'bow', 'flower', 'headphones', 
 
 export const OUTFITS: OutfitKind[] = ['none', 'scarf', 'bowtie', 'tie', 'chain', 'medal', 'cape', 'wings']
 
-export const AURAS: AuraKind[] = ['none', 'bubbles', 'sparkle', 'hearts', 'stars', 'flames', 'rainbow']
+/** Append only — order is baked into saved `c:` look codes. */
+export const AURAS: AuraKind[] = [
+  'none',
+  'bubbles',
+  'sparkle',
+  'hearts',
+  'stars',
+  'flames',
+  'rainbow',
+  'orbit',
+  'lightning',
+  'petals',
+  'snow',
+  'void',
+  'neon',
+  'rings',
+]
 
 export type Look = {
   shape: number
@@ -129,7 +145,20 @@ export const LOOK_PRICES: Partial<Record<keyof Look, Record<number, number>>> = 
   eyes: { 5: 200, 6: 200, 7: 250 },
   hat: { 5: 200, 6: 250, 7: 300, 8: 300, 9: 400 },
   outfit: { 4: 250, 5: 250, 6: 350, 7: 450 },
-  aura: { 2: 300, 3: 300, 4: 400, 5: 400, 6: 500 },
+  aura: {
+    // 0 none, 1 bubbles, 2 sparkle are free starters
+    3: 150,
+    4: 200,
+    5: 280,
+    6: 350,
+    7: 420,
+    8: 500,
+    9: 380,
+    10: 320,
+    11: 700,
+    12: 900,
+    13: 1200,
+  },
 }
 
 export const lookItemKey = (field: keyof Look, index: number) => `${field}:${index}`

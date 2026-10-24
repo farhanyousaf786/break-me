@@ -12,8 +12,9 @@ import { REVENUECAT_KEY } from './keys'
 
 /**
  * Google Play Billing on Android, through RevenueCat.
- * In RevenueCat, mark `remove_ads`, `hero_squad` and `hero_*` as non-consumable so Play keeps them
- * owned (restorable); `coins_*` stay consumable so they can be bought again.
+ * In RevenueCat, mark `remove_ads`, unlock packs (`all_fighters`, `all_guns`, `all_auras`,
+ * `all_fighters_guns`), `hero_squad` and `hero_*` as non-consumable so Play keeps them owned
+ * (restorable); `coins_*` stay consumable so they can be bought again.
  */
 
 const store = observable<StoreState>({ status: 'loading', prices: {} })
@@ -29,13 +30,19 @@ const txsFor = (info: CustomerInfo | null, productId: string) =>
 function onCustomerInfo(info: CustomerInfo) {
   lastInfo = info
   const skins: string[] = []
+  const guns: string[] = []
+  const auras: string[] = []
   let noAds = false
   for (const tx of info.nonSubscriptionTransactions) {
     const product = productById(tx.productIdentifier)
-    if (product?.kind === 'skins') skins.push(...product.skins)
+    if (product?.kind === 'unlock') {
+      if (product.skins) skins.push(...product.skins)
+      if (product.guns) guns.push(...product.guns)
+      if (product.auras) auras.push(...product.auras)
+    }
     if (product?.kind === 'noAds') noAds = true
   }
-  applyOwnership({ skins, noAds })
+  applyOwnership({ skins, guns, auras, noAds })
 
   for (const [productId, before] of pendingCoins) {
     const txs = txsFor(info, productId)
@@ -59,18 +66,28 @@ async function initPurchases() {
     if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG)
     Purchases.configure({ apiKey: REVENUECAT_KEY })
     Purchases.addCustomerInfoUpdateListener(onCustomerInfo)
-    const products = await Purchases.getProducts(
-      ALL_PRODUCTS.map((p) => p.id),
-      PRODUCT_CATEGORY.NON_SUBSCRIPTION,
-    )
+    const wanted = ALL_PRODUCTS.map((p) => p.id)
+    const products = await Purchases.getProducts(wanted, PRODUCT_CATEGORY.NON_SUBSCRIPTION)
     const prices: Record<string, string> = {}
     for (const p of products) {
       storeProducts.set(p.identifier, p)
       prices[p.identifier] = p.priceString
     }
+    if (__DEV__) {
+      const loaded = products.map((p) => p.identifier)
+      const missing = wanted.filter((id) => !storeProducts.has(id))
+      console.log('[IAP] Play returned', loaded.length, 'products:', loaded.join(', ') || '(none)')
+      if (missing.length) {
+        console.warn(
+          '[IAP] NOT in Play yet (PRODUCT_NOT_FOUND) — shop shows fallback price but buy will fail:',
+          missing.join(', '),
+        )
+      }
+    }
     store.set({ status: 'ready', prices })
     onCustomerInfo(await Purchases.getCustomerInfo())
-  } catch {
+  } catch (e) {
+    if (__DEV__) console.warn('[IAP] init failed', e)
     store.set({ status: 'off' })
   }
 }
@@ -82,7 +99,16 @@ async function buy(product: Product): Promise<BuyResult> {
     return 'ok'
   }
   const storeProduct = storeProducts.get(product.id)
-  if (status !== 'ready' || !storeProduct) return 'unavailable'
+  if (status !== 'ready' || !storeProduct) {
+    if (__DEV__) {
+      console.warn(
+        `[IAP] buy blocked — "${product.id}" not loaded from Play.`,
+        'Loaded:',
+        [...storeProducts.keys()].join(', ') || '(none)',
+      )
+    }
+    return 'unavailable'
+  }
   try {
     const { transaction } = await Purchases.purchaseStoreProduct(storeProduct)
     grantPurchase(transaction.transactionIdentifier, grantFor(product))

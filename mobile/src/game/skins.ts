@@ -11,7 +11,21 @@ export type ExtraKind = 'none' | 'whiskers' | 'patches' | 'spots' | 'eyepatch' |
 export type EyeKind = 'normal' | 'happy' | 'sleepy' | 'wink' | 'dizzy' | 'star' | 'heart' | 'sparkle'
 export type HatKind = 'none' | 'party' | 'bow' | 'flower' | 'headphones' | 'propeller' | 'tophat' | 'halo' | 'devil' | 'crown'
 export type OutfitKind = 'none' | 'scarf' | 'bowtie' | 'tie' | 'chain' | 'medal' | 'cape' | 'wings'
-export type AuraKind = 'none' | 'bubbles' | 'sparkle' | 'hearts' | 'stars' | 'flames' | 'rainbow'
+export type AuraKind =
+  | 'none'
+  | 'bubbles'
+  | 'sparkle'
+  | 'hearts'
+  | 'stars'
+  | 'flames'
+  | 'rainbow'
+  | 'orbit'
+  | 'lightning'
+  | 'petals'
+  | 'snow'
+  | 'void'
+  | 'neon'
+  | 'rings'
 
 export type PremiumGroup = 'heroes' | 'villains' | 'legends'
 
@@ -111,7 +125,7 @@ export const SKINS: Skin[] = [
   { id: 'smash', name: 'Smash', hero: true, shape: 'human', body: '#7b3fb0', accent: '#4a1f70', belly: '#6fcf4a', skinTone: '#6fcf4a', hair: 'messy', hairColor: '#1f1a2e', ears: 'none', mouth: 'fang', extra: 'angry' },
   { id: 'starla', name: 'Starla', hero: true, shape: 'human', body: '#d6263f', accent: '#1f4fb8', belly: '#e8b48a', skinTone: '#e8b48a', hair: 'long', hairColor: '#1c1a24', ears: 'none', mouth: 'smile', extra: 'tiara' },
   { id: 'zippy', name: 'Zippy', hero: true, shape: 'human', suit: 'zip', body: '#e0262f', accent: '#ffcf3f', belly: '#f1c9a5', skinTone: '#f1c9a5', hairColor: '#e0262f', ears: 'none', mouth: 'smile', extra: 'none' },
-  { id: 'bucky', name: 'Bucky', hero: true, shape: 'human', body: '#2d3340', accent: '#161a22', belly: '#f1c9a5', skinTone: '#f1c9a5', hair: 'shaggy', hairColor: '#3a2a20', glove: '#c3cad6', ears: 'none', mouth: 'none', extra: 'soldier' },
+  { id: 'bucky', name: 'Steel Hand', hero: true, shape: 'human', body: '#2d3340', accent: '#161a22', belly: '#f1c9a5', skinTone: '#f1c9a5', hair: 'shaggy', hairColor: '#3a2a20', glove: '#c3cad6', ears: 'none', mouth: 'none', extra: 'soldier' },
   { id: 'jester', name: 'Jester', hero: true, group: 'villains', shape: 'human', body: '#6b2fa0', accent: '#2b1640', belly: '#f4f4f6', skinTone: '#f4f4f6', hair: 'messy', hairColor: '#3fbf4a', ears: 'none', mouth: 'none', extra: 'jester' },
   { id: 'goo', name: 'Goo', hero: true, group: 'villains', body: '#1b1b28', accent: '#0b0b12', belly: '#1b1b28', ears: 'none', mouth: 'fang', extra: 'venom' },
   { id: 'trickster', name: 'Trickster', hero: true, group: 'villains', shape: 'human', body: '#1f7a3a', accent: '#c9a227', belly: '#f1d3b8', skinTone: '#f1d3b8', hair: 'long', hairColor: '#15121a', cape: '#145a2a', ears: 'none', mouth: 'smile', extra: 'trickster' },

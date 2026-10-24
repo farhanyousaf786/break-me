@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSyncExternalStore } from 'react'
 import type { LevelConfig } from './levels'
-import { DEFAULT_GUN, getGun, isGunId } from './guns'
-import { SKINS, type Skin } from './skins'
+import { DEFAULT_AURA, FREE_AURAS, getAura, isAuraId } from './auras'
+import { DEFAULT_GUN, FREE_GUNS, getGun, isGunId } from './guns'
+import { AURAS, lookItemKey } from './look'
+import { SKINS, type AuraKind, type Skin } from './skins'
 
 /* ---------------------------------------------------------------- economy */
 
@@ -62,6 +64,9 @@ export type Wallet = {
   /** Owned gun skins and the one in hand */
   guns: string[]
   gun: string
+  /** Owned auras and the one equipped on your fighter */
+  auras: AuraKind[]
+  aura: AuraKind
   /** Unlocked premium creator items, as `field:index` keys */
   looks: string[]
 }
@@ -74,8 +79,10 @@ const EMPTY: Wallet = {
   noAds: false,
   granted: [],
   videos: { day: '', count: 0 },
-  guns: [DEFAULT_GUN],
+  guns: [...FREE_GUNS],
   gun: DEFAULT_GUN,
+  auras: [...FREE_AURAS],
+  aura: DEFAULT_AURA,
   looks: [],
 }
 
@@ -117,7 +124,23 @@ export async function loadWallet(equipped: string[]): Promise<Wallet> {
     return wallet
   }
   const owned = Array.isArray(raw.owned) ? raw.owned.filter(valid) : []
-  const guns = [...new Set([DEFAULT_GUN, ...(Array.isArray(raw.guns) ? raw.guns.filter(isGunId) : [])])]
+  const guns = [...new Set([...FREE_GUNS, ...(Array.isArray(raw.guns) ? raw.guns.filter(isGunId) : [])])]
+  const looks = Array.isArray(raw.looks) ? [...new Set(raw.looks.filter((k): k is string => typeof k === 'string'))] : []
+  // Creator aura unlocks (aura:N) count as owned locker auras too.
+  const fromLooks = looks
+    .map((k) => {
+      const m = /^aura:(\d+)$/.exec(k)
+      if (!m) return null
+      return AURAS[Number(m[1])] ?? null
+    })
+    .filter((id): id is AuraKind => Boolean(id))
+  const auras = [
+    ...new Set([
+      ...FREE_AURAS,
+      ...(Array.isArray(raw.auras) ? raw.auras.filter(isAuraId) : []),
+      ...fromLooks,
+    ]),
+  ]
   wallet = {
     coins: Math.max(0, Math.floor(Number(raw.coins) || 0)),
     owned: [...new Set([...FREE_SKINS, ...owned])],
@@ -128,7 +151,9 @@ export async function loadWallet(equipped: string[]): Promise<Wallet> {
       raw.videos && typeof raw.videos.day === 'string' ? { day: raw.videos.day, count: Number(raw.videos.count) || 0 } : EMPTY.videos,
     guns,
     gun: isGunId(raw.gun) && guns.includes(raw.gun) ? raw.gun : DEFAULT_GUN,
-    looks: Array.isArray(raw.looks) ? [...new Set(raw.looks.filter((k): k is string => typeof k === 'string'))] : [],
+    auras,
+    aura: isAuraId(raw.aura) && auras.includes(raw.aura) ? raw.aura : DEFAULT_AURA,
+    looks,
   }
   listeners.forEach((l) => l())
   return wallet
@@ -173,13 +198,43 @@ export function buyLookItems(items: { key: string; price: number }[]): boolean {
   const total = fresh.reduce((sum, i) => sum + i.price, 0)
   if (fresh.length === 0) return true
   if (wallet.coins < total) return false
-  commit({ ...wallet, coins: wallet.coins - total, looks: [...wallet.looks, ...fresh.map((i) => i.key)] })
+  const looks = [...wallet.looks, ...fresh.map((i) => i.key)]
+  const auras = [...wallet.auras]
+  for (const i of fresh) {
+    const m = /^aura:(\d+)$/.exec(i.key)
+    if (!m) continue
+    const id = AURAS[Number(m[1])]
+    if (id && !auras.includes(id)) auras.push(id)
+  }
+  commit({ ...wallet, coins: wallet.coins - total, looks, auras })
   return true
 }
 
 export function equipGun(id: string) {
   if (wallet.guns.includes(id) && wallet.gun !== id) commit({ ...wallet, gun: id })
 }
+
+export function buyAura(id: string): boolean {
+  const aura = getAura(id)
+  if (aura.id !== id || wallet.auras.includes(aura.id) || wallet.coins < aura.price) return false
+  const index = AURAS.indexOf(aura.id)
+  const lookKey = index >= 0 ? lookItemKey('aura', index) : null
+  const looks = lookKey && !wallet.looks.includes(lookKey) ? [...wallet.looks, lookKey] : wallet.looks
+  commit({
+    ...wallet,
+    coins: wallet.coins - aura.price,
+    auras: [...wallet.auras, aura.id],
+    aura: aura.id,
+    looks,
+  })
+  return true
+}
+
+export function equipAura(id: string) {
+  if (!isAuraId(id) || !wallet.auras.includes(id) || wallet.aura === id) return
+  commit({ ...wallet, aura: id })
+}
+
 
 export function addCoins(amount: number) {
   commit({ ...wallet, coins: wallet.coins + amount })
@@ -197,25 +252,60 @@ export function claimVideoCoins(amount: number) {
   commit({ ...wallet, coins: wallet.coins + amount, videos: { day, count } })
 }
 
+type OwnershipGrant = {
+  coins?: number
+  skins?: string[]
+  guns?: string[]
+  auras?: string[]
+  noAds?: boolean
+}
+
+function withAuraLooks(auras: AuraKind[], looks: string[]) {
+  const next = [...looks]
+  for (const id of auras) {
+    const i = AURAS.indexOf(id)
+    if (i < 0) continue
+    const key = lookItemKey('aura', i)
+    if (!next.includes(key)) next.push(key)
+  }
+  return next
+}
+
 /** Applies a store purchase once per transaction id (restores re-deliver old transactions). */
-export function grantPurchase(txId: string, grant: { coins?: number; skins?: string[]; noAds?: boolean }) {
+export function grantPurchase(txId: string, grant: OwnershipGrant) {
   if (wallet.granted.includes(txId)) return false
+  const guns = [...new Set([...wallet.guns, ...(grant.guns ?? []).filter(isGunId)])]
+  const auras = [...new Set([...wallet.auras, ...(grant.auras ?? []).filter(isAuraId)])] as AuraKind[]
   commit({
     ...wallet,
     coins: wallet.coins + (grant.coins ?? 0),
     owned: [...new Set([...wallet.owned, ...(grant.skins ?? [])])],
+    guns,
+    auras,
+    looks: withAuraLooks(auras, wallet.looks),
     noAds: wallet.noAds || Boolean(grant.noAds),
     granted: [...wallet.granted, txId],
   })
   return true
 }
 
-/** Non-consumables (heroes, Remove Ads) are re-applied from the store on restore, regardless of transaction id. */
-export function applyOwnership(grant: { skins?: string[]; noAds?: boolean }) {
+/** Non-consumables are re-applied from the store on restore, regardless of transaction id. */
+export function applyOwnership(grant: OwnershipGrant) {
   const owned = [...new Set([...wallet.owned, ...(grant.skins ?? [])])]
+  const guns = [...new Set([...wallet.guns, ...(grant.guns ?? []).filter(isGunId)])]
+  const auras = [...new Set([...wallet.auras, ...(grant.auras ?? []).filter(isAuraId)])] as AuraKind[]
+  const looks = withAuraLooks(auras, wallet.looks)
   const noAds = wallet.noAds || Boolean(grant.noAds)
-  if (owned.length === wallet.owned.length && noAds === wallet.noAds) return
-  commit({ ...wallet, owned, noAds })
+  if (
+    owned.length === wallet.owned.length &&
+    guns.length === wallet.guns.length &&
+    auras.length === wallet.auras.length &&
+    looks.length === wallet.looks.length &&
+    noAds === wallet.noAds
+  ) {
+    return
+  }
+  commit({ ...wallet, owned, guns, auras, looks, noAds })
 }
 
 /** Tester shortcut. */

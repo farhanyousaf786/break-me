@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { signInWithGoogle, signOutPlayer, type Player } from '../net/account'
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { deletePlayerAccount, signInWithGoogle, signOutPlayer, type Player } from '../net/account'
 import { onlineConfigured } from '../net/firebase'
 import { useRank } from '../net/rank'
 import { Avatar } from './Avatar'
+import { PlayerName } from './PlayerName'
 import { RankCard } from './RankCard'
 import { useStats } from './stats'
 import { useWallet } from './wallet'
@@ -21,6 +22,7 @@ import { colors } from './theme'
 import { GameButton, Icon, Panel, ScreenHeader, type IconName } from './ui'
 import { openPrivacyOptions, useAds } from '../monetize/ads'
 import { restore } from '../monetize/purchases'
+import { PRIVACY_URL, TERMS_URL } from './legal'
 
 const LEVEL_LABELS = ['Off', 'Low', 'Mid', 'High'] as const
 
@@ -163,6 +165,7 @@ function StatTiles({ player }: { player: Player | null | undefined }) {
 function AccountPanel({ player, skinId }: { player: Player | null | undefined; skinId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState(false)
   const google = player?.kind === 'google'
 
   const run = async (action: () => Promise<unknown>) => {
@@ -184,10 +187,14 @@ function AccountPanel({ player, skinId }: { player: Player | null | undefined; s
         <Avatar player={player} skinId={skinId} size={52} ring={google ? colors.blue : colors.textFaint} />
         <View style={styles.accountText}>
           <View style={styles.accountNameRow}>
-            <Text style={styles.accountName} numberOfLines={1}>
-              {google ? player.name : 'Not signed in'}
-            </Text>
-            {google && (
+            {google ? (
+              <PlayerName player={player} textStyle={styles.accountName} onEditing={setRenaming} />
+            ) : (
+              <Text style={styles.accountName} numberOfLines={1}>
+                Not signed in
+              </Text>
+            )}
+            {google && !renaming && (
               <View style={styles.googleBadge}>
                 <Text style={styles.googleBadgeText}>GOOGLE</Text>
               </View>
@@ -201,7 +208,34 @@ function AccountPanel({ player, skinId }: { player: Player | null | undefined; s
       {onlineConfigured &&
         player !== undefined &&
         (google ? (
-          <GameButton label="Sign Out" variant="dark" size="sm" disabled={busy} onPress={() => run(signOutPlayer)} />
+          <>
+            <GameButton label="Sign Out" variant="dark" size="sm" disabled={busy} onPress={() => run(signOutPlayer)} />
+            <GameButton
+              label="Delete Account"
+              variant="red"
+              size="sm"
+              disabled={busy}
+              onPress={() => {
+                Alert.alert(
+                  'Delete account?',
+                  'This permanently removes your Google sign-in for Break Buddies and your online ranking. Purchases stay with Google Play and can be restored on a new account. This cannot be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () =>
+                        run(async () => {
+                          const ok = await deletePlayerAccount()
+                          if (!ok) return
+                          Alert.alert('Account deleted', 'Your account and ranking data are gone.')
+                        }),
+                    },
+                  ],
+                )
+              }}
+            />
+          </>
         ) : (
           <GameButton
             label="Sign in with Google"
@@ -255,6 +289,26 @@ export function SettingsScreen({
         {privacyOptions && (
           <GameButton label="Ad Privacy Options" icon="gear" variant="dark" size="sm" onPress={() => void openPrivacyOptions()} />
         )}
+        <GameButton
+          label="Privacy Policy"
+          icon="gear"
+          variant="dark"
+          size="sm"
+          onPress={() => {
+            playTap()
+            void Linking.openURL(PRIVACY_URL)
+          }}
+        />
+        <GameButton
+          label="Terms of Service"
+          icon="gear"
+          variant="dark"
+          size="sm"
+          onPress={() => {
+            playTap()
+            void Linking.openURL(TERMS_URL)
+          }}
+        />
       </Panel>
       <Text style={styles.credit}>All music and sounds are original, made for Break Buddies.</Text>
     </ScrollView>

@@ -12,7 +12,7 @@
       ".indexOn": ["rp"],
       "$uid": {
         ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider === 'google.com'",
-        ".validate": "newData.child('rp').isNumber() && newData.child('rp').val() >= 0"
+        ".validate": "!newData.exists() || (newData.child('rp').isNumber() && newData.child('rp').val() >= 0)"
       }
     }
   }

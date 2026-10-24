@@ -9,11 +9,11 @@
     "backgroundColor": "#0c0b1d",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.breakbuddies.ushnfay"
+      "bundleIdentifier": "com.breakbuddies.wolfhowlsstudio"
     },
     "android": {
-      "package": "com.breakbuddies.ushnfay",
-      "versionCode": 1,
+      "package": "com.breakbuddies.wolfhowlsstudio",
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#1a1440",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -40,7 +40,7 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "androidAppId": "ca-app-pub-1690469075436631~6813334595",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511",
           "delayAppMeasurementInit": true,
           "userTrackingUsageDescription": "This lets us show you ads that are more relevant. Break Buddies stays free either way."
@@ -69,10 +69,16 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "127584dc-1ac2-45b9-8a4d-cff152e21c92"
+      }
+    },
+    "owner": "farhanyousaf1996"
   },
   "react-native-google-mobile-ads": {
-    "android_app_id": "ca-app-pub-3940256099942544~3347511713",
+    "android_app_id": "ca-app-pub-1690469075436631~6813334595",
     "ios_app_id": "ca-app-pub-3940256099942544~1458002511",
     "delay_app_measurement_init": true
   }

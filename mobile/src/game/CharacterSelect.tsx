@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { AuraLocker } from './AuraLocker'
 import { GunLocker } from './GunLocker'
 import { MyCharacterPanel } from './MyCharacterPanel'
 import { ME_ID, PREMIUM_GROUPS, SKINS, getSkin, premiumGroup, type Skin, type SkinChoice } from './skins'
@@ -8,8 +9,7 @@ import { playTap, playVoice, type Voice } from './sound'
 import { colors } from './theme'
 import { CoinChip, CoinDot, GameButton, Icon, Panel, ScreenHeader } from './ui'
 import { RARITY, buySkin, priceOf, rarityOf, useWallet } from './wallet'
-import { heroProduct } from '../monetize/config'
-import { buy, priceLabel, useStore } from '../monetize/purchases'
+import type { ShopFocus } from '../monetize/config'
 
 const COLUMNS = 3
 
@@ -25,7 +25,7 @@ type Props = {
   skins: SkinChoice
   onChange: (skins: SkinChoice) => void
   onBack: () => void
-  onShop: () => void
+  onShop: (focus?: ShopFocus) => void
 }
 
 type Side = 'blue' | 'red'
@@ -37,18 +37,21 @@ const sideTint: Record<Side, string> = {
 }
 
 const PREMIUM = SKINS.filter((s) => s.hero)
+/** Custom “Me!” buddy — kept in code, hidden from the Characters screen for now. */
+const SHOW_MY_BUDDY = false
 
 export function CharacterSelect({ skins, onChange, onBack, onShop }: Props) {
   const side: Side = 'blue'
-  const [tab, setTab] = useState<'fighters' | 'guns'>('fighters')
+  const [tab, setTab] = useState<'fighters' | 'guns' | 'auras'>('fighters')
   const [shopping, setShopping] = useState<Skin | null>(null)
   const wallet = useWallet()
   const owns = (id: string) => wallet.owned.includes(id)
+  const tabs = [
+    { id: 'fighters' as const, label: 'Fighters' },
+    { id: 'guns' as const, label: 'Guns' },
+    { id: 'auras' as const, label: 'Auras' },
+  ]
 
-  // Owned first, then cheapest first, so the next thing to aim for is always near the top.
-  const regular = SKINS.filter((s) => !s.hero).sort(
-    (a, b) => Number(owns(b.id)) - Number(owns(a.id)) || priceOf(a) - priceOf(b),
-  )
   const ownedCount = SKINS.filter((s) => owns(s.id)).length
 
   const pick = (skin: Skin) => {
@@ -78,63 +81,65 @@ export function CharacterSelect({ skins, onChange, onBack, onShop }: Props) {
         <ScreenHeader title="Characters" onBack={onBack} right={<CoinChip coins={wallet.coins} onPress={onShop} />} />
 
         <View style={styles.tabs}>
-          {(['fighters', 'guns'] as const).map((t) => (
+          {tabs.map((t) => (
             <Pressable
-              key={t}
+              key={t.id}
               onPress={() => {
                 playTap()
-                setTab(t)
+                setTab(t.id)
               }}
-              style={[styles.tab, tab === t && styles.tabOn]}
+              style={[styles.tab, tab === t.id && styles.tabOn]}
             >
-              <Text style={[styles.tabText, tab === t && styles.tabTextOn]}>{t === 'fighters' ? 'Fighters' : 'Guns'}</Text>
+              <Text style={[styles.tabText, tab === t.id && styles.tabTextOn]}>{t.label}</Text>
             </Pressable>
           ))}
         </View>
 
         {tab === 'guns' && <GunLocker skinId={skins.blue} onShop={onShop} />}
+        {tab === 'auras' && <AuraLocker skinId={skins.blue} onShop={onShop} />}
 
         {tab === 'fighters' && (
           <>
-            <View style={styles.youRow}>
-              <SkinPreview skinId={skins.blue} side="blue" size={76} animated weapon={wallet.gun} />
-              <View style={styles.youInfo}>
-                <View style={styles.slotPill}>
-                  <Text style={styles.slotPillText}>YOU</Text>
-                </View>
-                <Text style={styles.slotName} numberOfLines={1}>
-                  {getSkin(skins.blue).name}
-                </Text>
-                <Text style={styles.sub}>
-                  {ownedCount}/{SKINS.length} unlocked · CPU picks a random rival
-                </Text>
+            <Panel style={styles.fighterStage}>
+              <View style={styles.slotPill}>
+                <Text style={styles.slotPillText}>YOU</Text>
               </View>
-            </View>
+              <SkinPreview
+                skinId={skins.blue}
+                side="blue"
+                size={150}
+                animated
+                weapon={wallet.gun}
+                aura={wallet.aura}
+              />
+              <Text style={styles.stageName} numberOfLines={1}>
+                {getSkin(skins.blue).name}
+              </Text>
+              <Text style={[styles.stageTier, { color: RARITY[rarityOf(getSkin(skins.blue))].color }]}>
+                {RARITY[rarityOf(getSkin(skins.blue))].label.toUpperCase()}
+              </Text>
+              <Text style={styles.stageSub}>
+                {ownedCount}/{SKINS.length} unlocked · CPU picks a random rival
+              </Text>
+            </Panel>
 
-            <MyCharacterPanel
-              side={side}
-              selected={skins[side] === ME_ID}
-              sideColor={sideColor[side]}
-              onSelect={() => {
-                playVoice(PICK_VOICES[Math.floor(Math.random() * PICK_VOICES.length)])
-                onChange({ ...skins, [side]: ME_ID })
-              }}
-            />
+            {SHOW_MY_BUDDY && (
+              <MyCharacterPanel
+                side={side}
+                selected={skins[side] === ME_ID}
+                sideColor={sideColor[side]}
+                onSelect={() => {
+                  playVoice(PICK_VOICES[Math.floor(Math.random() * PICK_VOICES.length)])
+                  onChange({ ...skins, [side]: ME_ID })
+                }}
+              />
+            )}
 
-            <PremiumPager owns={owns} card={card} />
-
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>ALL CHARACTERS</Text>
-            </View>
-            <View style={styles.grid}>
-              {regular.map(card)}
-              {gridFillers(regular.length)}
-            </View>
+            <FighterCatalog owns={owns} card={card} />
 
             <Text style={styles.earnHint}>
               Earn coins by clearing levels (fewer shots = more stars = more coins) and playing online.
             </Text>
-
           </>
         )}
 
@@ -147,17 +152,12 @@ export function CharacterSelect({ skins, onChange, onBack, onShop }: Props) {
           side={side}
           coins={wallet.coins}
           onClose={() => setShopping(null)}
-          onShop={() => {
+          onShop={(focus) => {
             setShopping(null)
-            onShop()
+            onShop(focus)
           }}
           onBuy={() => {
             if (!buySkin(shopping)) return
-            playVoice('yay')
-            onChange({ ...skins, [side]: shopping.id })
-            setShopping(null)
-          }}
-          onBought={() => {
             playVoice('yay')
             onChange({ ...skins, [side]: shopping.id })
             setShopping(null)
@@ -168,37 +168,100 @@ export function CharacterSelect({ skins, onChange, onBack, onShop }: Props) {
   )
 }
 
-const PREMIUM_PAGES = PREMIUM_GROUPS.map((g) => ({ ...g, members: PREMIUM.filter((s) => premiumGroup(s) === g.id) })).filter(
-  (g) => g.members.length > 0,
-)
+type CatalogPage = {
+  id: string
+  /** Short chip label (fits small screens). */
+  chip: string
+  title: string
+  blurb: string
+  color: string
+  members: Skin[]
+  premium?: boolean
+}
 
-/** One premium category per page: swipe left / right, or tap a category chip. */
-function PremiumPager({ owns, card }: { owns: (id: string) => boolean; card: (skin: Skin) => ReactNode }) {
+const CHIP_LABEL: Record<string, string> = {
+  all: 'All',
+  heroes: 'Heroes',
+  villains: 'Villains',
+  legends: 'Legends',
+}
+
+const sortFighters = (list: Skin[], owns: (id: string) => boolean) =>
+  [...list].sort((a, b) => Number(owns(b.id)) - Number(owns(a.id)) || priceOf(a) - priceOf(b))
+
+const CATALOG_PAGES = (owns: (id: string) => boolean): CatalogPage[] => [
+  {
+    id: 'all',
+    chip: CHIP_LABEL.all,
+    title: 'ALL',
+    blurb: 'Every fighter — free, coin unlocks and premium.',
+    color: colors.blue,
+    members: sortFighters(SKINS, owns),
+  },
+  ...PREMIUM_GROUPS.map((g) => ({
+    id: g.id,
+    chip: CHIP_LABEL[g.id] ?? g.title,
+    title: g.title,
+    blurb: g.blurb,
+    color: g.color,
+    premium: true as const,
+    members: sortFighters(
+      PREMIUM.filter((s) => premiumGroup(s) === g.id),
+      owns,
+    ),
+  })).filter((g) => g.members.length > 0),
+]
+
+/** All fighters by default, plus Heroes / Villains / Legends chips. */
+function FighterCatalog({ owns, card }: { owns: (id: string) => boolean; card: (skin: Skin) => ReactNode }) {
+  const pages = CATALOG_PAGES(owns)
   const [width, setWidth] = useState(0)
   const [page, setPage] = useState(0)
   const pager = useRef<ScrollView>(null)
 
   const go = (i: number) => {
+    if (i < 0 || i >= pages.length) return
     playTap()
     setPage(i)
-    pager.current?.scrollTo({ x: i * width, animated: true })
+    if (width > 0) pager.current?.scrollTo({ x: i * width, animated: true })
   }
 
   return (
-    <View style={styles.pager} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-      <View style={styles.chips}>
-        {PREMIUM_PAGES.map((g, i) => (
-          <Pressable
-            key={g.id}
-            onPress={() => go(i)}
-            style={[styles.chip, { borderColor: `${g.color}80` }, page === i && { backgroundColor: g.color, borderColor: g.color }]}
-          >
-            <Text style={[styles.chipText, { color: page === i ? '#0c0b1d' : g.color }]} numberOfLines={1}>
-              {g.title}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+    <View
+      style={styles.pager}
+      onLayout={(e) => {
+        const w = Math.floor(e.nativeEvent.layout.width)
+        if (w > 0 && w !== width) setWidth(w)
+      }}
+    >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        contentContainerStyle={styles.chips}
+      >
+        {pages.map((g, i) => {
+          const on = page === i
+          return (
+            <Pressable
+              key={g.id}
+              onPress={() => go(i)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={({ pressed }) => [
+                styles.chip,
+                { borderColor: `${g.color}80` },
+                on && { backgroundColor: g.color, borderColor: g.color },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.chipText, { color: on ? '#0c0b1d' : g.color }]} numberOfLines={1}>
+                {g.chip}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
 
       {width > 0 && (
         <ScrollView
@@ -207,18 +270,27 @@ function PremiumPager({ owns, card }: { owns: (id: string) => boolean; card: (sk
           pagingEnabled
           nestedScrollEnabled
           showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+          onMomentumScrollEnd={(e) => {
+            const w = width
+            if (w <= 0) return
+            const next = Math.round(e.nativeEvent.contentOffset.x / w)
+            setPage(Math.max(0, Math.min(pages.length - 1, next)))
+          }}
         >
-          {PREMIUM_PAGES.map((g) => {
+          {pages.map((g) => {
             const ownedHere = g.members.filter((s) => owns(s.id)).length
             return (
               <View key={g.id} style={{ width }}>
                 <Panel style={[styles.heroPanel, { borderColor: `${g.color}80` }]}>
                   <View style={styles.sectionHead}>
-                    <Text style={[styles.sectionTitle, { color: g.color }]}>{g.title}</Text>
-                    <View style={[styles.premiumTag, { backgroundColor: g.color }]}>
-                      <Text style={styles.premiumTagText}>PREMIUM</Text>
-                    </View>
+                    <Text style={[styles.sectionTitle, { color: g.color, flexShrink: 1 }]} numberOfLines={1}>
+                      {g.title}
+                    </Text>
+                    {g.premium && (
+                      <View style={[styles.premiumTag, { backgroundColor: g.color }]}>
+                        <Text style={styles.premiumTagText}>PREMIUM</Text>
+                      </View>
+                    )}
                     <Text style={styles.groupCount}>
                       {ownedHere}/{g.members.length}
                     </Text>
@@ -236,7 +308,7 @@ function PremiumPager({ owns, card }: { owns: (id: string) => boolean; card: (sk
       )}
 
       <View style={styles.dots}>
-        {PREMIUM_PAGES.map((g, i) => (
+        {pages.map((g, i) => (
           <View key={g.id} style={[styles.dot, page === i && { backgroundColor: g.color, width: 18 }]} />
         ))}
         <Text style={styles.swipeHint}>swipe for more</Text>
@@ -303,7 +375,6 @@ function BuySheet({
   side,
   coins,
   onBuy,
-  onBought,
   onShop,
   onClose,
 }: {
@@ -311,28 +382,11 @@ function BuySheet({
   side: Side
   coins: number
   onBuy: () => void
-  /** Bought with real money through the store */
-  onBought: () => void
-  onShop: () => void
+  onShop: (focus?: ShopFocus) => void
   onClose: () => void
 }) {
   const rarity = RARITY[rarityOf(skin)]
   const short = rarity.price - coins
-  const store = useStore()
-  const product = heroProduct(skin.id)
-  const [paying, setPaying] = useState(false)
-  const [failed, setFailed] = useState('')
-
-  const payNow = async () => {
-    if (!product || paying) return
-    setPaying(true)
-    setFailed('')
-    const result = await buy(product)
-    setPaying(false)
-    if (result === 'ok') onBought()
-    else if (result === 'pending') setFailed("Payment pending — the hero unlocks as soon as it goes through.")
-    else if (result !== 'cancelled') setFailed("Couldn't reach the store. Try again later.")
-  }
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.scrim} onPress={onClose}>
@@ -352,23 +406,19 @@ function BuySheet({
                 <Text style={styles.sheetShort}>
                   You need {short} more {short === 1 ? 'coin' : 'coins'}. Clear levels with fewer shots to earn more!
                 </Text>
-                <GameButton label="Get Coins" icon="bag" variant="gold" onPress={onShop} />
+                <GameButton label="Get Coins" icon="bag" variant="gold" onPress={() => onShop('coins')} />
+                {skin.hero && (
+                  <GameButton
+                    label="Unlock all fighters"
+                    icon="star"
+                    variant="blue"
+                    onPress={() => onShop('unlocks')}
+                  />
+                )}
               </>
             ) : (
               <GameButton label={`Unlock for ${rarity.price}`} icon="check" variant="green" size="lg" onPress={onBuy} />
             )}
-            {product && (
-              <>
-                <Text style={styles.or}>or unlock instantly</Text>
-                <GameButton
-                  label={paying ? 'Opening store…' : `Buy now · ${priceLabel(product, store.prices)}`}
-                  variant="blue"
-                  disabled={paying}
-                  onPress={payNow}
-                />
-              </>
-            )}
-            {failed !== '' && <Text style={styles.sheetShort}>{failed}</Text>}
             <GameButton label="Not now" variant="dark" size="sm" onPress={onClose} />
           </Panel>
         </Pressable>
@@ -406,69 +456,73 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: colors.textDim,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   tabTextOn: {
     color: '#0c0b1d',
   },
-  youRow: {
-    flexDirection: 'row',
+  fighterStage: {
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.blue,
-    backgroundColor: 'rgba(94, 200, 255, 0.1)',
-  },
-  youInfo: {
-    flex: 1,
-    alignItems: 'flex-start',
-    gap: 3,
+    gap: 6,
+    paddingVertical: 12,
   },
   slotPill: {
-    paddingVertical: 2,
+    paddingVertical: 3,
     paddingHorizontal: 10,
     borderRadius: 999,
     backgroundColor: colors.blue,
   },
   slotPillText: {
     color: '#0c0b1d',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  slotName: {
-    color: colors.text,
-    fontWeight: '900',
-    fontSize: 17,
-  },
-  sub: {
-    color: colors.textFaint,
     fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  stageName: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  stageTier: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginTop: -4,
+  },
+  stageSub: {
+    color: colors.textFaint,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   pager: {
     gap: 8,
   },
   chips: {
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+    paddingRight: 4,
   },
   chip: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     alignItems: 'center',
-    paddingVertical: 7,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1.5,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    minHeight: 34,
   },
   chipText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.6,
   },
   dots: {
     flexDirection: 'row',
@@ -496,6 +550,8 @@ const styles = StyleSheet.create({
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    rowGap: 4,
     gap: 8,
   },
   sectionTitle: {

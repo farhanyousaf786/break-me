@@ -15,7 +15,7 @@ import { signInWithGoogle, type Player } from '../net/account'
 import { tierFor, useRank } from '../net/rank'
 import { Avatar } from './Avatar'
 import { LEVELS } from './levels'
-import { getSkin, type SkinChoice } from './skins'
+import { getSkin, type AuraKind, type SkinChoice } from './skins'
 import { SkinPreview } from './SkinPreview'
 import { playTap, preloadShots } from './sound'
 import { colors } from './theme'
@@ -23,6 +23,7 @@ import { CoinChip, GameButton, Icon, IconButton, Panel, type IconName } from './
 import { useWallet } from './wallet'
 import { DailyButton } from './DailyRewards'
 import { EarnCoinsButton } from './EarnCoins'
+import { loadIntroGuideSeen, saveIntroGuideSeen } from './storage'
 
 type Props = {
   skins: SkinChoice
@@ -31,6 +32,8 @@ type Props = {
   player: Player | null | undefined
   onPlay: () => void
   onOnline: () => void
+  /** Opens Online → create private room (play with a friend). */
+  onPlayFriend: () => void
   onCharacters: () => void
   onShop: () => void
   onProfile: () => void
@@ -47,6 +50,7 @@ export function IntroScreen({
   player,
   onPlay,
   onOnline,
+  onPlayFriend,
   onCharacters,
   onShop,
   onProfile,
@@ -54,8 +58,18 @@ export function IntroScreen({
   onUnlockAll,
 }: Props) {
   const [testerOpen, setTesterOpen] = useState(false)
-  const { coins, gun } = useWallet()
+  const [showGuide, setShowGuide] = useState(false)
+  const { coins, gun, aura } = useWallet()
   useEffect(() => preloadShots([gun]), [gun])
+  useEffect(() => {
+    let alive = true
+    void loadIntroGuideSeen().then((seen) => {
+      if (alive && !seen) setShowGuide(true)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
   const { height: windowH } = useWindowDimensions()
   const [bodyH, setBodyH] = useState(windowH - 120)
   const onBodyLayout = (e: LayoutChangeEvent) => setBodyH(e.nativeEvent.layout.height)
@@ -65,6 +79,11 @@ export function IntroScreen({
   const titleSize = Math.round(54 * k)
   const fighterSize = Math.round(124 * k)
   const showTag = bodyH >= 600
+
+  const dismissGuide = () => {
+    setShowGuide(false)
+    saveIntroGuideSeen()
+  }
 
   return (
     <View style={styles.root}>
@@ -108,6 +127,7 @@ export function IntroScreen({
           <Pressable
             onPress={() => {
               playTap()
+              if (showGuide) dismissGuide()
               onCharacters()
             }}
             accessibilityRole="button"
@@ -117,7 +137,7 @@ export function IntroScreen({
             <Panel style={styles.stage}>
               <View style={[styles.half, styles.halfBlue]} />
               <View style={[styles.half, styles.halfRed]} />
-              <Fighter skinId={skins.blue} side="blue" tag="YOU" size={fighterSize} weapon={gun} />
+              <Fighter skinId={skins.blue} side="blue" tag="YOU" size={fighterSize} weapon={gun} aura={aura} />
               <View style={[styles.vsBadge, { marginBottom: fighterSize * 0.35 }]}>
                 <Text style={styles.vsText}>VS</Text>
               </View>
@@ -125,6 +145,7 @@ export function IntroScreen({
               <View style={styles.changeHint} pointerEvents="none">
                 <Text style={styles.changeHintText}>TAP TO CHANGE</Text>
               </View>
+              {showGuide && <GuideMark n={1} label="Pick your look" style={styles.guideOnStage} />}
             </Panel>
           </Pressable>
           {showTag && <Text style={styles.tag}>Tap to shoot · recoil spins you around · hit them first!</Text>}
@@ -134,17 +155,33 @@ export function IntroScreen({
           <ModeCards
             level={Math.min(unlocked, LEVELS.length)}
             online={player?.kind === 'google'}
-            onAdventure={onPlay}
-            onOnline={onOnline}
+            showGuide={showGuide}
+            onAdventure={() => {
+              if (showGuide) dismissGuide()
+              onPlay()
+            }}
+            onOnline={() => {
+              if (showGuide) dismissGuide()
+              onOnline()
+            }}
+            onPlayFriend={() => {
+              if (showGuide) dismissGuide()
+              onPlayFriend()
+            }}
           />
           <View style={styles.secondaryRow}>
-            <GameButton label="Characters & Guns" variant="blue" size="sm" onPress={onCharacters} style={styles.secondaryWide} />
+            <GameButton label="Fighters · Guns · Auras" variant="blue" size="sm" onPress={onCharacters} style={styles.secondaryWide} />
             <GameButton label="Shop" icon="bag" variant="gold" size="sm" onPress={onShop} style={styles.secondaryShop} />
           </View>
           <View style={styles.pills}>
             <DailyButton />
             <EarnCoinsButton />
           </View>
+          {showGuide && (
+            <Pressable onPress={dismissGuide} accessibilityRole="button" accessibilityLabel="Dismiss tips">
+              <Text style={styles.guideDismiss}>Got it — hide tips</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
 
@@ -153,31 +190,45 @@ export function IntroScreen({
   )
 }
 
-/** The two ways to play: Adventure (CPU levels) and Online (Google sign-in first if needed). */
+function GuideMark({ n, label, style }: { n: number; label: string; style?: object }) {
+  return (
+    <View style={[styles.guideMark, style]} pointerEvents="none">
+      <View style={styles.guideNum}>
+        <Text style={styles.guideNumText}>{n}</Text>
+      </View>
+      <Text style={styles.guideLabel}>{label}</Text>
+    </View>
+  )
+}
+
+/** Adventure (CPU), quick online, and private room with a friend. */
 function ModeCards({
   level,
   online,
+  showGuide,
   onAdventure,
   onOnline,
+  onPlayFriend,
 }: {
   level: number
   /** Signed in with Google */
   online: boolean
+  showGuide: boolean
   onAdventure: () => void
   onOnline: () => void
+  onPlayFriend: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const pick = async (mode: 'cpu' | 'online') => {
+  const goOnline = async (then: () => void) => {
     if (busy) return
     playTap()
-    if (mode === 'cpu') return onAdventure()
-    if (online) return onOnline()
+    if (online) return then()
     setError(null)
     setBusy(true)
     try {
-      if (await signInWithGoogle()) onOnline()
+      if (await signInWithGoogle()) then()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sign-in failed. Please try again.')
     } finally {
@@ -185,40 +236,69 @@ function ModeCards({
     }
   }
 
-  const option = (mode: 'cpu' | 'online', icon: IconName, title: string, sub: string, color: string, badge?: string) => (
-    <Pressable
-      onPress={() => void pick(mode)}
-      disabled={busy}
-      accessibilityRole="button"
-      accessibilityLabel={sub ? `${title}. ${sub}` : title}
-      style={({ pressed }) => [styles.mode, { borderColor: color }, pressed && styles.stagePressed]}
-    >
-      <View style={[styles.modeIcon, { backgroundColor: color }]}>
-        <Icon name={icon} size={18} color="#10122a" />
-      </View>
-      <View style={styles.modeText}>
-        <Text style={styles.modeTitle} numberOfLines={1}>
-          {title}
-        </Text>
-        {sub !== '' && (
-          <Text style={styles.modeSub} numberOfLines={1}>
-            {sub}
-          </Text>
-        )}
-      </View>
-      {badge && (
-        <View style={styles.modeBadge}>
-          <Text style={styles.modeBadgeText}>{badge}</Text>
+  const option = (
+    onPress: () => void,
+    icon: IconName,
+    title: string,
+    sub: string,
+    color: string,
+    guide?: { n: number; label: string },
+  ) => (
+    <View style={styles.modeWrap}>
+      <Pressable
+        onPress={onPress}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={sub ? `${title}. ${sub}` : title}
+        style={({ pressed }) => [styles.mode, { borderColor: color }, pressed && styles.stagePressed]}
+      >
+        <View style={[styles.modeIcon, { backgroundColor: color }]}>
+          <Icon name={icon} size={18} color="#10122a" />
         </View>
-      )}
-    </Pressable>
+        <View style={styles.modeText}>
+          <Text style={styles.modeTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          {sub !== '' && (
+            <Text style={styles.modeSub} numberOfLines={1}>
+              {sub}
+            </Text>
+          )}
+        </View>
+      </Pressable>
+      {showGuide && guide && <GuideMark n={guide.n} label={guide.label} style={styles.guideOnMode} />}
+    </View>
   )
 
   return (
     <View style={styles.modes}>
-      <View style={styles.modeRow}>
-        {option('online', 'play', 'Play Live', busy ? 'Signing in…' : online ? '' : 'Sign-in required', colors.green)}
-        {option('cpu', 'levels', 'Adventure', `vs CPU · Stage ${level}`, colors.gold)}
+      <View style={styles.modeCol}>
+        {option(
+          () => {
+            playTap()
+            onAdventure()
+          },
+          'levels',
+          'Adventure',
+          `vs CPU · Stage ${level}`,
+          colors.gold,
+          { n: 2, label: 'Solo levels' },
+        )}
+        {option(
+          () => void goOnline(onOnline),
+          'play',
+          'Play Live',
+          busy ? 'Signing in…' : online ? 'Find a rival' : 'Sign-in required',
+          colors.green,
+        )}
+        {option(
+          () => void goOnline(onPlayFriend),
+          'user',
+          'Play with Friend',
+          busy ? 'Signing in…' : 'Create a private room',
+          colors.blue,
+          { n: 3, label: 'Share a room code' },
+        )}
       </View>
       {busy && <ActivityIndicator color={colors.gold} />}
       {error && <Text style={styles.modeError}>{error}</Text>}
@@ -331,12 +411,14 @@ function Fighter({
   tag,
   size,
   weapon,
+  aura,
 }: {
   skinId: string
   side: 'blue' | 'red'
   tag: string
   size: number
   weapon?: string
+  aura?: AuraKind
 }) {
   const tint = side === 'blue' ? colors.blue : colors.red
   return (
@@ -356,7 +438,7 @@ function Fighter({
           ]}
         />
         <View style={StyleSheet.absoluteFill}>
-          <SkinPreview skinId={skinId} side={side} size={size} animated weapon={weapon} />
+          <SkinPreview skinId={skinId} side={side} size={size} animated weapon={weapon} aura={aura} />
         </View>
       </View>
       <View style={[styles.sidePill, { backgroundColor: tint }]}>
@@ -577,17 +659,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: -16,
   },
-  modeRow: {
-    flexDirection: 'row',
+  modeCol: {
     gap: 8,
   },
+  modeWrap: {
+    position: 'relative',
+  },
   mode: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     borderRadius: 14,
     borderWidth: 2,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
@@ -607,18 +690,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
-  modeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 999,
-    backgroundColor: '#4285f4',
-  },
-  modeBadgeText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
   modeError: {
     color: colors.red,
     fontSize: 12,
@@ -629,6 +700,52 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 10,
     fontWeight: '700',
+  },
+  guideMark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    backgroundColor: colors.gold,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  guideOnStage: {
+    position: 'absolute',
+    bottom: 10,
+    alignSelf: 'center',
+  },
+  guideOnMode: {
+    position: 'absolute',
+    right: 8,
+    top: -10,
+  },
+  guideNum: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#3d2805',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guideNumText: {
+    color: colors.gold,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  guideLabel: {
+    color: '#3d2805',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  guideDismiss: {
+    color: colors.textFaint,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   scrim: {
     flex: 1,

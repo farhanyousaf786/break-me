@@ -1657,54 +1657,217 @@ function sparkleShape(p: Painter, x: number, y: number, s: number, style: Style)
 /** Animated effect around the whole character, behind everything else. */
 function drawAura(p: Painter, skin: Skin, now: number) {
   switch (skin.aura) {
-    case 'bubbles':
-      for (let i = 0; i < 6; i++) {
-        const t = (now * 0.0005 + i / 6) % 1
-        const x = Math.sin(i * 2.3 + t * 4) * 6 + (i - 2.5) * 8
-        p.circle(x, 20 - t * 48, 2 + (i % 3) * 0.8, { stroke: '#9bd7ff', width: 1.4, alpha: 1 - t })
+    case 'bubbles': {
+      p.glow(0, 4, 34, 30, '#7ec8ff', 0.18)
+      for (let i = 0; i < 10; i++) {
+        const t = (now * 0.00055 + i / 10) % 1
+        const sway = Math.sin(i * 2.4 + t * 5) * 8
+        const x = sway + (i - 4.5) * 5.5
+        const y = 22 - t * 52
+        const r = 2.2 + (i % 4) * 0.9 + Math.sin(now * 0.008 + i) * 0.4
+        const a = Math.min(1, (1 - t) * 1.4)
+        p.circle(x, y, r, { stroke: '#b8e8ff', width: 1.6, alpha: a })
+        p.circle(x - r * 0.35, y - r * 0.35, r * 0.28, { fill: '#ffffff', alpha: a * 0.7 })
       }
       break
-    case 'sparkle':
-      p.glow(0, 0, 30, 28, '#fff1a8', 0.22)
-      for (let i = 0; i < 6; i++) {
-        const t = (i / 6) * Math.PI * 2 + now * 0.0008
-        const s = 1.1 + 0.7 * Math.sin(now * 0.006 + i * 1.7)
-        sparkleShape(p, Math.cos(t) * 30, Math.sin(t) * 26, Math.max(0.3, s), { fill: '#fff6b0' })
+    }
+    case 'sparkle': {
+      p.glow(0, 0, 36, 32, '#fff1a8', 0.32)
+      p.glow(0, 0, 22, 20, '#ffffff', 0.12)
+      for (let i = 0; i < 8; i++) {
+        const t = (i / 8) * Math.PI * 2 + now * 0.0011
+        const pulse = 1.2 + 0.9 * Math.sin(now * 0.007 + i * 1.7)
+        const r = 28 + Math.sin(now * 0.004 + i) * 3
+        sparkleShape(p, Math.cos(t) * r, Math.sin(t) * r * 0.85, Math.max(0.4, pulse), { fill: i % 2 ? '#fff6b0' : '#ffffff' })
       }
       break
-    case 'hearts':
-      for (let i = 0; i < 5; i++) {
-        const t = (now * 0.00045 + i / 5) % 1
-        const x = Math.sin(i * 2.1 + t * 3) * 6 + (i - 2) * 10
+    }
+    case 'hearts': {
+      p.glow(0, 2, 32, 28, '#ff7eb6', 0.22)
+      for (let i = 0; i < 7; i++) {
+        const t = (now * 0.0005 + i / 7) % 1
+        const x = Math.sin(i * 2.1 + t * 3.5) * 9 + (i - 3) * 7
         p.save()
-        p.translate(x, 18 - t * 46)
-        p.rotate(Math.PI / 2)
-        heart(p, 0, 0, 3.2, { fill: '#ff5c8a', alpha: Math.min(1, (1 - t) * 1.6) })
+        p.translate(x, 20 - t * 50)
+        p.rotate(Math.sin(now * 0.004 + i) * 0.35)
+        const a = Math.min(1, (1 - t) * 1.7)
+        heart(p, 0, 0, 3.6 + (i % 3) * 0.4, { fill: i % 2 ? '#ff5c8a' : '#ff9ec4', alpha: a })
         p.restore()
       }
       break
-    case 'stars':
-      for (let i = 0; i < 5; i++) {
-        const t = now * 0.0012 + (i * Math.PI * 2) / 5
-        star(p, Math.cos(t) * 31, Math.sin(t) * 13 + 3, 3.4, { fill: SPRINKLE_COLORS[i], stroke: OUTLINE, width: 1 })
+    }
+    case 'stars': {
+      p.glow(0, 0, 34, 30, '#ffcf3f', 0.2)
+      for (let i = 0; i < 7; i++) {
+        const t = now * 0.0014 + (i * Math.PI * 2) / 7
+        const wobble = 1 + 0.08 * Math.sin(now * 0.006 + i)
+        star(p, Math.cos(t) * 32 * wobble, Math.sin(t) * 14 * wobble + 2, 3.8, {
+          fill: SPRINKLE_COLORS[i % SPRINKLE_COLORS.length],
+          stroke: OUTLINE,
+          width: 1,
+        })
       }
       break
-    case 'flames':
-      p.glow(0, 6, 30, 26, '#ff7a1a', 0.35)
-      for (let i = 0; i < 8; i++) {
-        const x = -24 + i * 6.85
-        const h = 13 + 6 * Math.sin(now * 0.012 + i * 1.9)
-        p.poly([[x - 5, 18], [x, 18 - h], [x + 5, 18]], true, { fill: '#ff5a1f', alpha: 0.9 })
-        p.poly([[x - 2.5, 18], [x, 18 - h * 0.55], [x + 2.5, 18]], true, { fill: '#ffd23f' })
+    }
+    case 'flames': {
+      p.glow(0, 8, 34, 28, '#ff7a1a', 0.42)
+      p.glow(0, 10, 18, 14, '#ffd23f', 0.25)
+      for (let i = 0; i < 9; i++) {
+        const x = -26 + i * 6.5
+        const h = 14 + 8 * Math.sin(now * 0.014 + i * 1.7)
+        p.poly([[x - 5.5, 20], [x, 20 - h], [x + 5.5, 20]], true, { fill: '#ff4a12', alpha: 0.92 })
+        p.poly([[x - 3, 20], [x, 20 - h * 0.62], [x + 3, 20]], true, { fill: '#ff9a1f', alpha: 0.95 })
+        p.poly([[x - 1.4, 20], [x, 20 - h * 0.35], [x + 1.4, 20]], true, { fill: '#ffe66d' })
       }
       break
-    case 'rainbow':
-      p.glow(0, 2, 32, 30, '#b18cff', 0.2)
+    }
+    case 'rainbow': {
+      p.glow(0, 2, 38, 34, '#b18cff', 0.28)
       RAINBOW.forEach((c, i) => {
-        const a0 = now * 0.002 + i * 0.5
-        p.arc(0, 2, 26 + i * 2.2, a0, a0 + Math.PI * 1.3, { stroke: c, width: 2.2, alpha: 0.85 })
+        const a0 = now * 0.0022 + i * 0.45
+        p.arc(0, 2, 24 + i * 2.6, a0, a0 + Math.PI * 1.45, { stroke: c, width: 2.8, alpha: 0.9 })
       })
+      for (let i = 0; i < 5; i++) {
+        const t = now * 0.001 + i * 1.2
+        sparkleShape(p, Math.cos(t) * 34, Math.sin(t) * 18, 1.2, { fill: '#ffffff', alpha: 0.85 })
+      }
       break
+    }
+    case 'orbit': {
+      p.glow(0, 0, 36, 32, '#5cf2ff', 0.28)
+      for (let i = 0; i < 5; i++) {
+        const t = now * 0.002 + (i * Math.PI * 2) / 5
+        const x = Math.cos(t) * 30
+        const y = Math.sin(t) * 16
+        const c = RAINBOW[i % RAINBOW.length]
+        p.glow(x, y, 8, 8, c, 0.55)
+        p.circle(x, y, 4.2, { fill: c })
+        p.circle(x - 1.2, y - 1.4, 1.4, { fill: '#ffffff', alpha: 0.85 })
+      }
+      break
+    }
+    case 'lightning': {
+      p.glow(0, 0, 36, 32, '#7ec8ff', 0.3)
+      p.glow(0, 0, 20, 18, '#ffffff', 0.12)
+      for (let i = 0; i < 4; i++) {
+        const flash = Math.sin(now * 0.02 + i * 2.1)
+        if (flash < 0.15) continue
+        const a = ((i / 4) * Math.PI * 2 + now * 0.003) % (Math.PI * 2)
+        const x0 = Math.cos(a) * 12
+        const y0 = Math.sin(a) * 8
+        const x1 = Math.cos(a) * 34
+        const y1 = Math.sin(a) * 22
+        const mid = 0.35 + 0.3 * Math.sin(now * 0.05 + i)
+        const jx = (x0 + x1) * mid + Math.sin(now * 0.04 + i) * 6
+        const jy = (y0 + y1) * mid + Math.cos(now * 0.04 + i) * 4
+        const alpha = 0.55 + flash * 0.4
+        p.poly(
+          [
+            [x0, y0],
+            [jx, jy],
+            [x1, y1],
+          ],
+          false,
+          { stroke: '#eafcff', width: 2.4, alpha },
+        )
+        p.poly(
+          [
+            [x0, y0],
+            [jx, jy],
+            [x1, y1],
+          ],
+          false,
+          { stroke: '#5cf2ff', width: 1.2, alpha },
+        )
+      }
+      break
+    }
+    case 'petals': {
+      p.glow(0, 2, 34, 30, '#ff9ec4', 0.2)
+      for (let i = 0; i < 9; i++) {
+        const t = (now * 0.0004 + i / 9) % 1
+        const spin = now * 0.003 + i
+        const x = Math.sin(i * 1.7 + t * 4) * 14 + (i - 4) * 4
+        const y = 18 - t * 48
+        p.save()
+        p.translate(x, y)
+        p.rotate(spin)
+        p.oval(0, 0, 4.5, 2.2, 0, { fill: i % 2 ? '#ff7eb6' : '#ffc1d9', alpha: Math.min(1, (1 - t) * 1.5) })
+        p.restore()
+      }
+      break
+    }
+    case 'snow': {
+      p.glow(0, 0, 34, 30, '#bdefff', 0.22)
+      for (let i = 0; i < 12; i++) {
+        const t = (now * 0.00035 + i / 12) % 1
+        const x = ((i * 17 + now * 0.02) % 56) - 28
+        const y = -28 + t * 56
+        const s = 1.6 + (i % 3) * 0.5
+        const a = Math.min(1, t < 0.15 ? t / 0.15 : (1 - t) / 0.2)
+        p.poly(
+          [
+            [x, y - s],
+            [x, y + s],
+            [x - s, y],
+            [x + s, y],
+            [x - s * 0.7, y - s * 0.7],
+            [x + s * 0.7, y + s * 0.7],
+            [x - s * 0.7, y + s * 0.7],
+            [x + s * 0.7, y - s * 0.7],
+          ],
+          false,
+          { stroke: '#ffffff', width: 1.3, alpha: a * 0.95 },
+        )
+      }
+      break
+    }
+    case 'void': {
+      p.glow(0, 0, 38, 34, '#7c5cff', 0.35)
+      p.glow(0, 0, 18, 16, '#1b1f4b', 0.4)
+      for (let i = 0; i < 4; i++) {
+        const pulse = 22 + i * 5 + Math.sin(now * 0.005 + i) * 2
+        const a = 0.55 - i * 0.1
+        p.circle(0, 0, pulse, { stroke: i % 2 ? '#b18cff' : '#5c4dff', width: 2.2, alpha: a })
+      }
+      for (let i = 0; i < 6; i++) {
+        const t = now * 0.0015 + (i * Math.PI * 2) / 6
+        p.circle(Math.cos(t) * 30, Math.sin(t) * 18, 2.2, { fill: '#d4c4ff', alpha: 0.8 })
+      }
+      break
+    }
+    case 'neon': {
+      const hues = ['#00f0ff', '#ff00c8', '#39e27f', '#ffcf3f']
+      p.glow(0, 0, 36, 32, hues[Math.floor(now / 400) % hues.length], 0.35)
+      for (let i = 0; i < 3; i++) {
+        const beat = 0.5 + 0.5 * Math.sin(now * 0.008 + i)
+        const r = 20 + i * 7 + beat * 2
+        p.circle(0, 0, r, { stroke: hues[i], width: 2.6, alpha: 0.55 + beat * 0.35 })
+      }
+      for (let i = 0; i < 8; i++) {
+        const t = now * 0.0025 + (i * Math.PI * 2) / 8
+        p.circle(Math.cos(t) * 34, Math.sin(t) * 20, 1.8, { fill: hues[i % hues.length], alpha: 0.9 })
+      }
+      break
+    }
+    case 'rings': {
+      p.glow(0, -4, 36, 28, '#ffcf3f', 0.38)
+      p.glow(0, -6, 16, 12, '#fff3c4', 0.25)
+      for (let i = 0; i < 3; i++) {
+        const tilt = now * 0.0018 + i * 0.9
+        const rx = 28 - i * 3
+        const ry = 10 + i * 2
+        const steps = 18
+        const pts: [number, number][] = []
+        for (let s = 0; s <= steps; s++) {
+          const a = (s / steps) * Math.PI * 2 + tilt
+          pts.push([Math.cos(a) * rx, Math.sin(a) * ry - 6 + i * 2])
+        }
+        p.poly(pts, false, { stroke: i === 0 ? '#ffd76a' : '#c9a227', width: 2.2 - i * 0.3, alpha: 0.9 - i * 0.15 })
+      }
+      sparkleShape(p, 0, -28 + Math.sin(now * 0.006) * 2, 2.2, { fill: '#fff6b0' })
+      break
+    }
   }
 }
 

@@ -35,10 +35,10 @@ import {
 } from './myCharacter'
 import { ME_ID, type Shape } from './skins'
 import { SkinPreview } from './SkinPreview'
-import { playTap, playVoice } from './sound'
+import { playTap, playVoice, previewAura } from './sound'
 import { colors } from './theme'
 import { Backdrop, CoinChip, CoinDot, GameButton, Icon, IconButton } from './ui'
-import { buyLookItems, useWallet } from './wallet'
+import { buyLookItems, equipAura, useWallet } from './wallet'
 
 type Tab =
   | 'body' | 'skin' | 'hair' | 'hairColor' | 'eyes' | 'face' | 'ears' | 'extras'
@@ -115,20 +115,35 @@ export function CharacterCreator({ onClose, onSaved }: Props) {
   const skinFor = (l: Look) => ({ ...lookToSkin(l, ME_ID, 'Me!'), photo: photoOn && photoAllowed(l) })
   const draft = skinFor(look)
 
+  // Locker-bought auras count as unlocked in the creator too.
+  const ownedKeys = [
+    ...wallet.looks,
+    ...wallet.auras.flatMap((id) => {
+      const i = AURAS.indexOf(id)
+      return i >= 0 ? [lookItemKey('aura', i)] : []
+    }),
+  ]
+
   const set = (patch: Partial<Look>) => {
     playTap()
     setLook((l) => ({ ...l, ...patch }))
+    if (typeof patch.aura === 'number') {
+      const id = AURAS[patch.aura]
+      if (id) previewAura(id)
+      if (id && (lookItemPrice('aura', patch.aura) === 0 || ownedKeys.includes(lookItemKey('aura', patch.aura)))) {
+        equipAura(id)
+      }
+    }
   }
-
   const lockPrice = (field: keyof Look, index: number) =>
-    wallet.looks.includes(lookItemKey(field, index)) ? 0 : lookItemPrice(field, index)
-  const locked = lockedItems(look, wallet.looks).filter((i) => tabs.includes(FIELD_TAB[i.field]))
+    ownedKeys.includes(lookItemKey(field, index)) ? 0 : lookItemPrice(field, index)
+  const locked = lockedItems(look, ownedKeys).filter((i) => tabs.includes(FIELD_TAB[i.field]))
   const lockedTotal = locked.reduce((sum, i) => sum + i.price, 0)
 
   /** Unpaid premium picks this body doesn't show are dropped, so nothing unpaid gets saved. */
   const cleanLook = (): Look => {
     const next = { ...look }
-    for (const i of lockedItems(look, wallet.looks)) {
+    for (const i of lockedItems(look, ownedKeys)) {
       if (!tabs.includes(FIELD_TAB[i.field])) next[i.field] = DEFAULT_LOOK[i.field]
     }
     return next

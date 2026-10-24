@@ -17,6 +17,8 @@ export type Gun = {
   skin: string
   /** Gun skin id (guns.ts) */
   weapon?: string
+  /** Equipped aura id (auras.ts / AuraKind) */
+  aura?: string
   /** Premium burst guns: shots still to fire from the current trigger pull, and seconds until the next */
   burstLeft?: number
   burstTimer?: number
